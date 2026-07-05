@@ -141,8 +141,8 @@ git commit -m "Bump update.json to v$VERSION" || true
 git tag -d "v$VERSION" 2>/dev/null || true
 git tag -a "v$VERSION" -m "Release v$VERSION"
 
-# Push both the main branch and the tags to origin
-echo "=== Pushing commits and tags to GitHub ==="
-git push origin main --tags || true
+# Push the main branch and only the newly created tag to origin
+echo "=== Pushing commits and tag to GitHub ==="
+git push origin main "v$VERSION" || true
 
 echo "=== Release v$VERSION published successfully! ==="
