@@ -301,17 +301,21 @@ class WindowList {
         }
     }
     
+    /// Close and Zoom still need button presses — these only work reliably on the frontmost app.
+    /// For non-frontmost apps, we try AX frontmost promotion first.
     @discardableResult
     static func performWindowAction(window: WindowInfo, actionAttribute: CFString) -> Bool {
         let appRef = AXUIElementCreateApplication(window.pid)
         var windowsValue: AnyObject?
         guard AXUIElementCopyAttributeValue(appRef, kAXWindowsAttribute as CFString, &windowsValue) == .success,
-              let axWindows = windowsValue as? [AXUIElement] else {
-            return false
-        }
+              let axWindows = windowsValue as? [AXUIElement] else { return false }
         
         for axWindow in axWindows {
             if let id = getWindowID(from: axWindow), id == window.id {
+                AXUIElementSetAttributeValue(appRef, kAXFrontmostAttribute as CFString, kCFBooleanTrue)
+                AXUIElementSetAttributeValue(appRef, kAXFocusedWindowAttribute as CFString, axWindow)
+                AXUIElementPerformAction(axWindow, kAXRaiseAction as CFString)
+                
                 var buttonElement: AnyObject?
                 let error = AXUIElementCopyAttributeValue(axWindow, actionAttribute, &buttonElement)
                 if error == .success, let button = buttonElement {
@@ -323,9 +327,75 @@ class WindowList {
         return false
     }
 
+    /// Minimize by directly setting kAXMinimizedAttribute — works on any app, no button press needed.
+    static func minimizeWindow(window: WindowInfo) {
+        logAction("[minimizeWindow] Called for '\(window.ownerName):\(window.title)' pid=\(window.pid) id=\(window.id)")
+        let appRef = AXUIElementCreateApplication(window.pid)
+        var windowsValue: AnyObject?
+        let copyResult = AXUIElementCopyAttributeValue(appRef, kAXWindowsAttribute as CFString, &windowsValue)
+        guard copyResult == .success, let axWindows = windowsValue as? [AXUIElement] else {
+            logAction("[minimizeWindow] FAILED to get AX windows list. AXError=\(copyResult.rawValue)")
+            return
+        }
+        logAction("[minimizeWindow] Got \(axWindows.count) AX windows")
+        
+        for axWindow in axWindows {
+            if let id = getWindowID(from: axWindow), id == window.id {
+                let result = AXUIElementSetAttributeValue(axWindow, kAXMinimizedAttribute as CFString, kCFBooleanTrue)
+                logAction("[minimizeWindow] SetAttributeValue result=\(result.rawValue) (0=success)")
+                return
+            }
+        }
+        logAction("[minimizeWindow] No matching AX window found for id=\(window.id)")
+    }
+
     static func forceQuit(window: WindowInfo) {
         if let app = NSRunningApplication(processIdentifier: window.pid) {
             app.forceTerminate()
+        }
+    }
+    
+    /// Exit full screen by directly setting AXFullScreen attribute — works on any app, no button press needed.
+    static func exitFullScreen(window: WindowInfo) {
+        logAction("[exitFullScreen] Called for '\(window.ownerName):\(window.title)' pid=\(window.pid) id=\(window.id)")
+        let appRef = AXUIElementCreateApplication(window.pid)
+        var windowsValue: AnyObject?
+        let copyResult = AXUIElementCopyAttributeValue(appRef, kAXWindowsAttribute as CFString, &windowsValue)
+        guard copyResult == .success, let axWindows = windowsValue as? [AXUIElement] else {
+            logAction("[exitFullScreen] FAILED to get AX windows list. AXError=\(copyResult.rawValue)")
+            return
+        }
+        logAction("[exitFullScreen] Got \(axWindows.count) AX windows")
+        
+        for axWindow in axWindows {
+            if let id = getWindowID(from: axWindow), id == window.id {
+                // Check current fullscreen status first
+                var fsValue: AnyObject?
+                AXUIElementCopyAttributeValue(axWindow, "AXFullScreen" as CFString, &fsValue)
+                let isFS = fsValue as? Bool ?? false
+                logAction("[exitFullScreen] Window isFullScreen=\(isFS)")
+                
+                let result = AXUIElementSetAttributeValue(axWindow, "AXFullScreen" as CFString, kCFBooleanFalse)
+                logAction("[exitFullScreen] SetAttributeValue result=\(result.rawValue) (0=success)")
+                return
+            }
+        }
+        logAction("[exitFullScreen] No matching AX window found for id=\(window.id)")
+    }
+    
+    private static func logAction(_ msg: String) {
+        let logPath = "/Users/nikhiljain/.gemini/antigravity/brain/feb90e27-a96e-4b36-8783-aee805b013b9/scratch/action_debug.log"
+        let formattedMsg = "\(Date()): \(msg)\n"
+        if let data = formattedMsg.data(using: .utf8) {
+            if FileManager.default.fileExists(atPath: logPath) {
+                if let fh = FileHandle(forWritingAtPath: logPath) {
+                    fh.seekToEndOfFile()
+                    fh.write(data)
+                    fh.closeFile()
+                }
+            } else {
+                try? data.write(to: URL(fileURLWithPath: logPath))
+            }
         }
     }
 }

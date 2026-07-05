@@ -45,10 +45,67 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotkeyManagerDelegate {
         // Observe window actions triggered from the UI
         NotificationCenter.default.addObserver(
             self,
-            selector: #selector(refreshActiveWindows),
-            name: Notification.Name("windowActionTriggered"),
+            selector: #selector(handleWindowAction(_:)),
+            name: Notification.Name("performWindowAction"),
             object: nil
         )
+    }
+    
+    @objc func handleWindowAction(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let action = userInfo["action"] as? String,
+              let window = userInfo["window"] as? WindowInfo else {
+            logMessage("[handleWindowAction] guard failed — userInfo missing or cast failed")
+            return
+        }
+        
+        logMessage("[handleWindowAction] action='\(action)' app='\(window.ownerName)' title='\(window.title)' pid=\(window.pid) id=\(window.id)")
+        
+        // Hide the switcher first so focus can transfer to the target app
+        switcherWindow?.hide()
+        
+        if action == "forceQuit" {
+            WindowList.forceQuit(window: window)
+            return
+        }
+        
+        // Activate the target app
+        if let app = NSRunningApplication(processIdentifier: window.pid) {
+            app.activate(options: [.activateIgnoringOtherApps])
+            logMessage("[handleWindowAction] activate() called")
+        } else {
+            logMessage("[handleWindowAction] NSRunningApplication failed for pid=\(window.pid)")
+        }
+        
+        // Retry with increasing delays: 300ms, 600ms, 1000ms
+        let delays: [Double] = [0.3, 0.6, 1.0]
+        for (i, delay) in delays.enumerated() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                // Check if AX windows are available now
+                let appRef = AXUIElementCreateApplication(window.pid)
+                var windowsValue: AnyObject?
+                guard AXUIElementCopyAttributeValue(appRef, kAXWindowsAttribute as CFString, &windowsValue) == .success,
+                      let axWindows = windowsValue as? [AXUIElement], !axWindows.isEmpty else {
+                    self?.logMessage("[handleWindowAction] attempt \(i+1)/\(delays.count) — still 0 AX windows after \(delay)s")
+                    return
+                }
+                
+                self?.logMessage("[handleWindowAction] attempt \(i+1) — got \(axWindows.count) AX windows after \(delay)s, executing action")
+                
+                switch action {
+                case "close":
+                    WindowList.performWindowAction(window: window, actionAttribute: kAXCloseButtonAttribute as CFString)
+                case "minimize":
+                    WindowList.minimizeWindow(window: window)
+                case "zoom":
+                    WindowList.performWindowAction(window: window, actionAttribute: kAXZoomButtonAttribute as CFString)
+                case "exitFullScreen":
+                    WindowList.exitFullScreen(window: window)
+                default:
+                    break
+                }
+            }
+        }
     }
     
     @objc func handleAccessibilityGranted() {
@@ -58,7 +115,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotkeyManagerDelegate {
     
     
     func logMessage(_ msg: String) {
-        let logPath = "/Users/nikhiljain/.gemini/antigravity/brain/feb90e27-a96e-4b36-8783-aee805b013b9/scratch/sorting_test.log"
+        let logPath = "/Users/nikhiljain/.gemini/antigravity/brain/feb90e27-a96e-4b36-8783-aee805b013b9/scratch/action_debug.log"
         let fileManager = FileManager.default
         let formattedMsg = "\(Date()): \(msg)\n"
         if let data = formattedMsg.data(using: .utf8) {

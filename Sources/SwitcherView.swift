@@ -225,25 +225,27 @@ struct WindowCard: View {
                             HStack(spacing: CGFloat(6 * scale)) {
                                 // Close (Red)
                                 ActionButton(icon: "xmark", color: .red, scale: scale) {
-                                    WindowList.performWindowAction(window: window, actionAttribute: kAXCloseButtonAttribute as CFString)
-                                    notifyActionTriggered()
+                                    postWindowAction("close", window: window)
                                 }
                                 
                                 // Minimize (Yellow)
                                 ActionButton(icon: "minus", color: .yellow, scale: scale) {
-                                    WindowList.performWindowAction(window: window, actionAttribute: kAXMinimizeButtonAttribute as CFString)
-                                    notifyActionTriggered()
+                                    postWindowAction("minimize", window: window)
                                 }
                                 
                                 // Zoom/Maximize (Green)
                                 ActionButton(icon: "arrow.up.left.and.arrow.down.right", color: .green, scale: scale) {
-                                    WindowList.performWindowAction(window: window, actionAttribute: kAXZoomButtonAttribute as CFString)
+                                    postWindowAction("zoom", window: window)
+                                }
+                                
+                                // Exit Full Screen (Purple)
+                                ActionButton(icon: "arrow.down.right.and.arrow.up.left", color: .purple, scale: scale) {
+                                    postWindowAction("exitFullScreen", window: window)
                                 }
                                 
                                 // Force Quit (Gray)
                                 ActionButton(icon: "power", color: .gray, scale: scale) {
-                                    WindowList.forceQuit(window: window)
-                                    notifyActionTriggered()
+                                    postWindowAction("forceQuit", window: window)
                                 }
                             }
                             .padding(CGFloat(5 * scale))
@@ -309,10 +311,12 @@ struct WindowCard: View {
         }
     }
     
-    private func notifyActionTriggered() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            NotificationCenter.default.post(name: Notification.Name("windowActionTriggered"), object: nil)
-        }
+    private func postWindowAction(_ action: String, window: WindowInfo) {
+        NotificationCenter.default.post(
+            name: Notification.Name("performWindowAction"),
+            object: nil,
+            userInfo: ["action": action, "window": window]
+        )
     }
     
     private func loadThumbnail() {
