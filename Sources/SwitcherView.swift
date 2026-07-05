@@ -26,6 +26,7 @@ struct SwitcherView: View {
     let enableHoverSwitch: Bool
     let gridRows: Int
     let gridCols: Int
+    let refreshToken: UUID
     let onHoverIndex: (Int) -> Void
     let onClickIndex: (Int) -> Void
     
@@ -97,6 +98,7 @@ struct SwitcherView: View {
                                         isSelected: cardIndex == currentIndex,
                                         scale: scale,
                                         enableHoverSwitch: enableHoverSwitch,
+                                        refreshToken: refreshToken,
                                         onHover: { onHoverIndex(cardIndex) },
                                         onClick: { onClickIndex(cardIndex) }
                                     )
@@ -159,6 +161,7 @@ struct WindowCard: View {
     let isSelected: Bool
     let scale: Double
     let enableHoverSwitch: Bool
+    let refreshToken: UUID
     let onHover: () -> Void
     let onClick: () -> Void
     
@@ -294,6 +297,14 @@ struct WindowCard: View {
             .frame(width: CGFloat(cardWidth))
         }
         .onAppear {
+            loadThumbnail()
+        }
+        .onChange(of: refreshToken) { _ in
+            thumbnail = nil
+            loadThumbnail()
+        }
+        .onChange(of: window.id) { _ in
+            thumbnail = nil
             loadThumbnail()
         }
     }
