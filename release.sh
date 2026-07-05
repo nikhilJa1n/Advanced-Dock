@@ -60,15 +60,12 @@ fi
 
 # 6. Generate Changelog from Git Commit History
 echo "=== Generating Changelog from Git Commit History ==="
-PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
+# Find the most recent tag reachable from HEAD that is NOT the current version tag
+PREV_TAG=$(git tag --merged HEAD | grep -E "^v" | grep -v "^v$VERSION$" | sort -V | tail -n 1 || true)
+
 if [ -n "$PREV_TAG" ]; then
-    echo "Found previous release tag: $PREV_TAG. Extracting commits from last deployed tag to newest commit..."
-    # Check if the previous tag has a parent to safely use inclusive range
-    if git rev-parse "${PREV_TAG}^" >/dev/null 2>&1; then
-        CHANGELOG=$(git log "${PREV_TAG}^..HEAD" --pretty=format:"* %s" || true)
-    else
-        CHANGELOG=$(git log "${PREV_TAG}..HEAD" --pretty=format:"* %s" || true)
-    fi
+    echo "Found previous release tag: $PREV_TAG. Extracting commits from last deployed tag ($PREV_TAG) to newest commit..."
+    CHANGELOG=$(git log "${PREV_TAG}..HEAD" --pretty=format:"* %s" || true)
 else
     echo "No previous release tag found. Extracting full commit history..."
     CHANGELOG=$(git log --pretty=format:"* %s" || true)
