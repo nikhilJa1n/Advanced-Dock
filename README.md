@@ -24,12 +24,15 @@ Built natively in Swift and SwiftUI, AdvancedDock runs as a highly efficient bac
 *   **Window Cards & Thumbnails**: Real-time window preview cards featuring app-badge icons. Drag a card upwards to close the window instantly.
 *   **Aero Action Panel**: Quick window controls directly from the card (Close, Minimize, Maximize, Exit Full-Screen, Force Quit).
 *   **Window Snapping**: Snap windows to the left half, right half, or maximize them instantly with one click.
+*   **Customizable Grid**: Configure the switcher's grid layout (rows and columns) to fit your screen size and workspace preferences.
 
 ### 2. Interactive Dock Previews
 *   Hover over any active Dock icon to see real-time floating thumbnails of that application's open windows.
 *   Select, close, or snap windows directly from the dock hover preview panel.
+*   **Customizable Sizing**: Adjust the dock hover preview thumbnail size independently from 70% to 200% using a dedicated slider in the Control Panel settings.
 
 ### 3. Dynamic Themes
+*   **Glassmorphism**: Elegant frosted translucent borders (Default).
 *   **Ultra Minimal**: Clean, borderless, content-first flat theme.
 *   **Neon Blue**: Vibrant, cyberpunk-style glowing active borders and shadows.
 *   **Rainbow Sweep**: Beautiful animated spectrum gradients cycling around selected window cards.
