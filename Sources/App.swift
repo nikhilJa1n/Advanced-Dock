@@ -32,7 +32,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotkeyManagerDelegate {
         dockPreviewWindow = DockPreviewWindow()
         dockHoverMonitor = DockHoverMonitor(delegate: self)
         dockHoverMonitor?.previewWindowFrameProvider = { [weak self] in
-            return self?.dockPreviewWindow?.frame
+            guard let self = self, let previewWin = self.dockPreviewWindow, previewWin.isVisible else {
+                return nil
+            }
+            return previewWin.frame
         }
         
         // Initialize Hotkey Manager
