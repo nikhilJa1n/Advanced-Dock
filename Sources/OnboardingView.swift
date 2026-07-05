@@ -48,6 +48,10 @@ class AppState: ObservableObject {
         didSet { UserDefaults.standard.set(activeTheme, forKey: "activeTheme") }
     }
     
+    @Published var dockHoverThumbnailScale: Double {
+        didSet { UserDefaults.standard.set(dockHoverThumbnailScale, forKey: "dockHoverThumbnailScale") }
+    }
+    
     @Published var selectedAppFilter: String? = nil
     @Published var searchQuery: String = ""
     @Published var isSearchActive: Bool = false
@@ -69,6 +73,9 @@ class AppState: ObservableObject {
         self.gridCols = colsVal == 0 ? 5 : colsVal
         self.enableDockHoverPreviews = UserDefaults.standard.object(forKey: "enableDockHoverPreviews") as? Bool ?? true
         self.activeTheme = UserDefaults.standard.string(forKey: "activeTheme") ?? "Glassmorphism"
+        
+        let dockScaleVal = UserDefaults.standard.double(forKey: "dockHoverThumbnailScale")
+        self.dockHoverThumbnailScale = dockScaleVal == 0 ? 1.0 : dockScaleVal
         
         checkPermissions()
         startPermissionPolling()
@@ -367,6 +374,26 @@ struct PermissionsTab: View {
                                 .toggleStyle(CheckboxToggleStyle())
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundColor(.white.opacity(0.8))
+                            
+                            if state.enableDockHoverPreviews {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    HStack {
+                                        Text("Dock Hover Thumbnail Size")
+                                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                                            .foregroundColor(.white.opacity(0.9))
+                                        Spacer()
+                                        Text(String(format: "%.0f%%", state.dockHoverThumbnailScale * 100))
+                                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                            .foregroundColor(.blue)
+                                    }
+                                    .padding(.leading, 20)
+                                    
+                                    Slider(value: $state.dockHoverThumbnailScale, in: 0.7...2.0, step: 0.05)
+                                        .accentColor(.blue)
+                                        .padding(.leading, 20)
+                                }
+                                .padding(.top, 4)
+                            }
                         }
                         
                         Divider()

@@ -670,7 +670,7 @@ extension AppDelegate: DockHoverMonitorDelegate {
             appName: appName,
             windows: matchingWindows,
             dockItemFrame: itemFrame,
-            scale: appState.thumbnailScale
+            scale: appState.dockHoverThumbnailScale
         )
     }
     
