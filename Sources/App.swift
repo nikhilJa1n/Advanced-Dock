@@ -417,6 +417,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotkeyManagerDelegate {
         }
         
         if !(switcherWindow?.isVisible ?? false) {
+            appState.searchQuery = ""
+            appState.selectedAppFilter = nil
+            appState.isSearchActive = false
+            
             updateMRUWithActiveWindow()
             let (sorted, targetIdx) = getSortedWindowsAndIndex(backward: backward)
             activeWindows = sorted
@@ -554,8 +558,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotkeyManagerDelegate {
     }
     
     func hotkeyOptionReleased() {
-        // If search is active, pinned state is maintained: do not close switcher on option release
-        guard !appState.isSearchActive else { return }
+        // If the switcher is the key window (user clicked it to search/interact) or has active search query, pin it
+        guard !(switcherWindow?.isKeyWindow ?? false) && appState.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         
         if switcherWindow?.isVisible ?? false {
             switcherWindow?.hide()

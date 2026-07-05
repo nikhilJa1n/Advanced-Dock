@@ -62,7 +62,7 @@ class SwitcherWindow: NSPanel {
         }
         
         self.centerOnScreen()
-        self.makeKeyAndOrderFront(nil)
+        self.orderFront(nil)
     }
     
     func update(appState: AppState, windows: [WindowInfo], currentIndex: Int, scale: Double, enableHoverSwitch: Bool, gridRows: Int, gridCols: Int, onHover: @escaping (Int) -> Void, onClick: @escaping (Int) -> Void) {
