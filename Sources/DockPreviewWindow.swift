@@ -14,7 +14,7 @@ class DockPreviewWindow: NSPanel {
         
         self.isOpaque = false
         self.backgroundColor = .clear
-        self.hasShadow = true
+        self.hasShadow = false
         self.level = .statusBar
         self.collectionBehavior = [.canJoinAllSpaces, .ignoresCycle]
         self.ignoresMouseEvents = false

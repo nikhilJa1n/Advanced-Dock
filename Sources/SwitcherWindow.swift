@@ -23,7 +23,7 @@ class SwitcherWindow: NSPanel {
         
         self.isOpaque = false
         self.backgroundColor = .clear
-        self.hasShadow = true
+        self.hasShadow = false
         self.level = .statusBar // Place it above regular windows and system elements
         self.collectionBehavior = [.canJoinAllSpaces, .ignoresCycle] // Enable showing over fullscreen apps and multiple spaces
         self.ignoresMouseEvents = false // Allow mouse interactions if the user wants to click a thumbnail

@@ -29,8 +29,7 @@ struct DockPreviewView: View {
         .padding(padding)
         .frame(width: totalWidth, height: totalHeight)
         .background(
-            VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            VisualEffectView(material: .hudWindow, blendingMode: .behindWindow, cornerRadius: 14)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)

@@ -4,18 +4,31 @@ import CoreGraphics
 struct VisualEffectView: NSViewRepresentable {
     let material: NSVisualEffectView.Material
     let blendingMode: NSVisualEffectView.BlendingMode
+    var cornerRadius: CGFloat = 0
     
     func makeNSView(context: Context) -> NSVisualEffectView {
         let view = NSVisualEffectView()
         view.material = material
         view.blendingMode = blendingMode
         view.state = .active
+        
+        if cornerRadius > 0 {
+            view.wantsLayer = true
+            view.layer?.cornerRadius = cornerRadius
+            view.layer?.masksToBounds = true
+        }
         return view
     }
     
     func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
         nsView.material = material
         nsView.blendingMode = blendingMode
+        
+        if cornerRadius > 0 {
+            nsView.wantsLayer = true
+            nsView.layer?.cornerRadius = cornerRadius
+            nsView.layer?.masksToBounds = true
+        }
     }
 }
 
@@ -72,12 +85,20 @@ struct SwitcherView: View {
                             .foregroundColor(appState.selectedAppFilter == nil ? .blue : .white.opacity(0.6))
                             .frame(width: 44, height: 44)
                             .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(appState.selectedAppFilter == nil ? Color.blue.opacity(0.15) : Color.white.opacity(0.05))
+                                Group {
+                                    if appState.selectedAppFilter == nil {
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .fill(Color.blue.opacity(0.15))
+                                    }
+                                }
                             )
                             .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(appState.selectedAppFilter == nil ? Color.blue.opacity(0.6) : Color.white.opacity(0.12), lineWidth: 1.5)
+                                Group {
+                                    if appState.selectedAppFilter == nil {
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(Color.blue.opacity(0.6), lineWidth: 1.5)
+                                    }
+                                }
                             )
                         Text("All")
                             .font(.system(size: 9, weight: .bold, design: .rounded))
@@ -118,12 +139,20 @@ struct SwitcherView: View {
                                     }
                                     .frame(width: 44, height: 44)
                                     .background(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .fill(isSelected ? Color.blue.opacity(0.15) : Color.white.opacity(0.05))
+                                        Group {
+                                            if isSelected {
+                                                RoundedRectangle(cornerRadius: 12)
+                                                    .fill(Color.blue.opacity(0.15))
+                                            }
+                                        }
                                     )
                                     .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .stroke(isSelected ? Color.blue.opacity(0.6) : Color.white.opacity(0.12), lineWidth: 1.5)
+                                        Group {
+                                            if isSelected {
+                                                RoundedRectangle(cornerRadius: 12)
+                                                    .stroke(Color.blue.opacity(0.6), lineWidth: 1.5)
+                                            }
+                                        }
                                     )
                                     
                                     Text(app)
@@ -286,13 +315,13 @@ struct SwitcherView: View {
         // Solid fixed width and height to prevent sizing jumps and keep window bounded on screen
         .frame(width: CGFloat(contentWidth + 60 + 80), height: CGFloat(gridHeight + 217))
         .background(
-            VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
-                .cornerRadius(24)
+            VisualEffectView(material: .hudWindow, blendingMode: .behindWindow, cornerRadius: 24)
                 .overlay(
                     RoundedRectangle(cornerRadius: 24)
                         .stroke(Color.white.opacity(0.18), lineWidth: 1.5)
                 )
         )
+        .cornerRadius(24)
         .shadow(color: Color.black.opacity(0.6), radius: 24, x: 0, y: 12)
     }
 }
@@ -403,7 +432,7 @@ struct CardThumbnailView: View {
     }
     
     var borderWidth: CGFloat {
-        return isSelected ? 3.0 : 1.0
+        return isSelected ? 5.0 : 1.0
     }
     
     var shadowColor: Color {
@@ -517,10 +546,10 @@ struct CardThumbnailView: View {
                 if isSelected {
                     if isRainbow {
                         RoundedRectangle(cornerRadius: 12)
-                            .strokeBorder(rainbow, lineWidth: 3.0)
+                            .strokeBorder(rainbow, lineWidth: 5.0)
                     } else if isNeon {
                         RoundedRectangle(cornerRadius: 12)
-                            .strokeBorder(neon, lineWidth: 3.0)
+                            .strokeBorder(neon, lineWidth: 5.0)
                     }
                 }
             }
