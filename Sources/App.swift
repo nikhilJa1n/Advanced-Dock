@@ -8,9 +8,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotkeyManagerDelegate {
     var onboardingWindow: NSWindow?
     var statusBarItem: NSStatusItem?
     
+    // Dock Hover Previews
+    var dockHoverMonitor: DockHoverMonitor?
+    var dockPreviewWindow: DockPreviewWindow?
+    
     // Switcher state
     var activeWindows: [WindowInfo] = []
     var currentIndex: Int = 0
+    var mruWindowIDs: [CGWindowID] = []
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Disable stdout buffering for diagnostic logging
@@ -23,10 +28,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotkeyManagerDelegate {
         // Setup Switcher Window
         switcherWindow = SwitcherWindow()
         
+        // Setup Dock Previews
+        dockPreviewWindow = DockPreviewWindow()
+        dockHoverMonitor = DockHoverMonitor(delegate: self)
+        dockHoverMonitor?.previewWindowFrameProvider = { [weak self] in
+            return self?.dockPreviewWindow?.frame
+        }
+        
         // Initialize Hotkey Manager
         hotkeyManager = HotkeyManager(delegate: self)
         if appState.isAccessibilityGranted {
             hotkeyManager?.start()
+            dockHoverMonitor?.start()
         } else {
             showOnboarding()
         }
@@ -49,6 +62,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotkeyManagerDelegate {
             name: Notification.Name("performWindowAction"),
             object: nil
         )
+        
+        // Observe workspace application activation and space changes for MRU tracking
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(handleWorkspaceAppActivation(_:)),
+            name: NSWorkspace.didActivateApplicationNotification,
+            object: nil
+        )
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(handleActiveSpaceChanged(_:)),
+            name: NSWorkspace.activeSpaceDidChangeNotification,
+            object: nil
+        )
+        
+        // Initialize MRU with current active window
+        updateMRUWithActiveWindow()
     }
     
     @objc func handleWindowAction(_ notification: Notification) {
@@ -109,8 +139,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotkeyManagerDelegate {
     }
     
     @objc func handleAccessibilityGranted() {
-        print("[App] Accessibility permissions detected. Starting Hotkey Manager.")
+        print("[App] Accessibility permissions detected. Starting Hotkey Manager and Dock Monitor.")
         hotkeyManager?.start()
+        dockHoverMonitor?.start()
     }
     
     
@@ -131,18 +162,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotkeyManagerDelegate {
         }
     }
     
-    func getSortedWindowsAndIndex(backward: Bool) -> ([WindowInfo], Int) {
-        let rawWindows = WindowList.getWindows()
-        guard !rawWindows.isEmpty else { return ([], 0) }
-        
-        // Z-order index 1 is the previously active window
-        let previouslyActiveWindowID = rawWindows.count > 1 ? rawWindows[1].id : rawWindows[0].id
-        
+    func sortWindows(_ rawWindows: [WindowInfo]) -> [WindowInfo] {
         var sortedWindows = rawWindows
         let windowSortOrder = appState.windowSortOrder
-        
-        logMessage("Sorting request. Preference: '\(windowSortOrder)'")
-        logMessage("  - Raw: " + rawWindows.map { "\($0.ownerName):\($0.title)" }.joined(separator: ", "))
         
         switch windowSortOrder {
         case "App Name":
@@ -150,9 +172,38 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotkeyManagerDelegate {
         case "Window Title":
             sortedWindows.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
         default:
-            break
+            // "Recently Used"
+            sortedWindows.sort { (w1, w2) -> Bool in
+                let idx1 = mruWindowIDs.firstIndex(of: w1.id)
+                let idx2 = mruWindowIDs.firstIndex(of: w2.id)
+                if let i1 = idx1, let i2 = idx2 {
+                    return i1 < i2
+                } else if idx1 != nil {
+                    return true
+                } else if idx2 != nil {
+                    return false
+                }
+                // Fallback to original Z-order rank (which is rawWindows index)
+                let rank1 = rawWindows.firstIndex(where: { $0.id == w1.id }) ?? 999999
+                let rank2 = rawWindows.firstIndex(where: { $0.id == w2.id }) ?? 999999
+                return rank1 < rank2
+            }
         }
+        return sortedWindows
+    }
+    
+    func getSortedWindowsAndIndex(backward: Bool) -> ([WindowInfo], Int) {
+        let rawWindows = WindowList.getWindows()
+        guard !rawWindows.isEmpty else { return ([], 0) }
         
+        // Z-order index 1 is the previously active window
+        let previouslyActiveWindowID = rawWindows.count > 1 ? rawWindows[1].id : rawWindows[0].id
+        
+        let sortedWindows = sortWindows(rawWindows)
+        let windowSortOrder = appState.windowSortOrder
+        
+        logMessage("Sorting request. Preference: '\(windowSortOrder)'")
+        logMessage("  - Raw: " + rawWindows.map { "\($0.ownerName):\($0.title)" }.joined(separator: ", "))
         logMessage("  - Sorted: " + sortedWindows.map { "\($0.ownerName):\($0.title)" }.joined(separator: ", "))
         
         var targetIndex = 0
@@ -177,20 +228,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotkeyManagerDelegate {
             return
         }
         
-        var sortedWindows = rawWindows
+        let sortedWindows = sortWindows(rawWindows)
         let windowSortOrder = appState.windowSortOrder
         logMessage("Refresh active windows request. Preference: '\(windowSortOrder)'")
         logMessage("  - Raw: " + rawWindows.map { "\($0.ownerName):\($0.title)" }.joined(separator: ", "))
-        
-        switch windowSortOrder {
-        case "App Name":
-            sortedWindows.sort { $0.ownerName.localizedCaseInsensitiveCompare($1.ownerName) == .orderedAscending }
-        case "Window Title":
-            sortedWindows.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
-        default:
-            break
-        }
-        
         logMessage("  - Sorted: " + sortedWindows.map { "\($0.ownerName):\($0.title)" }.joined(separator: ", "))
         
         activeWindows = sortedWindows
@@ -236,6 +277,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotkeyManagerDelegate {
     func handleClickIndex(_ index: Int) {
         guard index >= 0 && index < activeWindows.count else { return }
         currentIndex = index
+        let target = activeWindows[currentIndex]
+        mruWindowIDs.removeAll(where: { $0 == target.id })
+        mruWindowIDs.insert(target.id, at: 0)
         hotkeyOptionReleased()
     }
     
@@ -306,6 +350,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotkeyManagerDelegate {
         }
         
         if !(switcherWindow?.isVisible ?? false) {
+            updateMRUWithActiveWindow()
             let (sorted, targetIdx) = getSortedWindowsAndIndex(backward: backward)
             activeWindows = sorted
             guard !activeWindows.isEmpty else { return }
@@ -367,6 +412,37 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotkeyManagerDelegate {
             }
         }
         
+        updateSwitcherView()
+    }
+    
+    func hotkeyVerticalArrowPressed(up: Bool) {
+        guard appState.enableArrowNavigation else { return }
+        guard switcherWindow?.isVisible ?? false, !activeWindows.isEmpty else { return }
+        
+        let cols = appState.gridCols
+        if up {
+            currentIndex -= cols
+            if currentIndex < 0 {
+                // Wrap to the last row, same column
+                let col = (currentIndex + cols) % cols
+                let lastRowStart = (activeWindows.count - 1) / cols * cols
+                currentIndex = min(lastRowStart + col, activeWindows.count - 1)
+            }
+        } else {
+            currentIndex += cols
+            if currentIndex >= activeWindows.count {
+                // Wrap to the first row, same column
+                currentIndex = currentIndex % cols
+                if currentIndex >= activeWindows.count {
+                    currentIndex = 0
+                }
+            }
+        }
+        
+        updateSwitcherView()
+    }
+    
+    private func updateSwitcherView() {
         switcherWindow?.update(
             windows: activeWindows,
             currentIndex: currentIndex,
@@ -413,6 +489,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotkeyManagerDelegate {
             
             if currentIndex >= 0 && currentIndex < activeWindows.count {
                 let target = activeWindows[currentIndex]
+                mruWindowIDs.removeAll(where: { $0 == target.id })
+                mruWindowIDs.insert(target.id, at: 0)
                 WindowList.raiseWindow(window: target)
             }
         }
@@ -427,5 +505,48 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotkeyManagerDelegate {
         }
         appState.isOptionKeyPressed = false
         appState.isTabKeyPressed = false
+    }
+    
+    // MARK: - MRU / Workspace Tracking Helpers
+    @objc func handleWorkspaceAppActivation(_ notification: Notification) {
+        updateMRUWithActiveWindow()
+    }
+    
+    @objc func handleActiveSpaceChanged(_ notification: Notification) {
+        updateMRUWithActiveWindow()
+    }
+    
+    func updateMRUWithActiveWindow() {
+        if let activeID = WindowList.getActiveWindowID() {
+            mruWindowIDs.removeAll(where: { $0 == activeID })
+            mruWindowIDs.insert(activeID, at: 0)
+        }
+    }
+}
+
+// MARK: - DockHoverMonitorDelegate
+extension AppDelegate: DockHoverMonitorDelegate {
+    func dockHoverMonitorDidHover(appName: String, itemFrame: CGRect) {
+        // Only show previews if the main switcher window is not visible to avoid clutter
+        guard !(switcherWindow?.isVisible ?? false) else { return }
+        
+        let allWindows = WindowList.getWindows()
+        let matchingWindows = allWindows.filter { $0.ownerName == appName }
+        
+        guard !matchingWindows.isEmpty else {
+            dockPreviewWindow?.hide()
+            return
+        }
+        
+        dockPreviewWindow?.show(
+            appName: appName,
+            windows: matchingWindows,
+            dockItemFrame: itemFrame,
+            scale: appState.thumbnailScale
+        )
+    }
+    
+    func dockHoverMonitorDidDismiss() {
+        dockPreviewWindow?.hide()
     }
 }

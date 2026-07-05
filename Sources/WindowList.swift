@@ -265,38 +265,64 @@ class WindowList {
         
         app.activate(options: [.activateIgnoringOtherApps])
         
-        // 2. Raise the specific window using Accessibility API
         let appRef = AXUIElementCreateApplication(window.pid)
-        var windowsValue: AnyObject?
-        guard AXUIElementCopyAttributeValue(appRef, kAXWindowsAttribute as CFString, &windowsValue) == .success,
-              let axWindows = windowsValue as? [AXUIElement] else {
-            return
-        }
         
-        // Match using private but reliable _AXUIElementGetWindow
-        for axWindow in axWindows {
-            if let id = getWindowID(from: axWindow), id == window.id {
-                // If minimized, unminimize first
-                var minimizedValue: AnyObject?
-                if AXUIElementCopyAttributeValue(axWindow, kAXMinimizedAttribute as CFString, &minimizedValue) == .success,
-                   let isMin = minimizedValue as? Bool, isMin {
-                    AXUIElementSetAttributeValue(axWindow, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
-                }
-                
-                AXUIElementPerformAction(axWindow, kAXRaiseAction as CFString)
-                return
+        @discardableResult
+        func tryRaise() -> Bool {
+            var windowsValue: AnyObject?
+            guard AXUIElementCopyAttributeValue(appRef, kAXWindowsAttribute as CFString, &windowsValue) == .success,
+                  let axWindows = windowsValue as? [AXUIElement] else {
+                return false
             }
+            
+            // Match using private but reliable _AXUIElementGetWindow
+            for axWindow in axWindows {
+                if let id = getWindowID(from: axWindow), id == window.id {
+                    // If minimized, unminimize first
+                    var minimizedValue: AnyObject?
+                    if AXUIElementCopyAttributeValue(axWindow, kAXMinimizedAttribute as CFString, &minimizedValue) == .success,
+                       let isMin = minimizedValue as? Bool, isMin {
+                        AXUIElementSetAttributeValue(axWindow, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
+                    }
+                    
+                    // Set as main and focused window for cross-space switching
+                    AXUIElementSetAttributeValue(appRef, kAXMainWindowAttribute as CFString, axWindow)
+                    AXUIElementSetAttributeValue(appRef, kAXFocusedWindowAttribute as CFString, axWindow)
+                    
+                    AXUIElementPerformAction(axWindow, kAXRaiseAction as CFString)
+                    return true
+                }
+            }
+            
+            // Fallback: match by title
+            for axWindow in axWindows {
+                var titleValue: AnyObject?
+                AXUIElementCopyAttributeValue(axWindow, kAXTitleAttribute as CFString, &titleValue)
+                let axTitle = titleValue as? String ?? ""
+                
+                if !axTitle.isEmpty && (axTitle == window.title || window.title.contains(axTitle)) {
+                    AXUIElementSetAttributeValue(appRef, kAXMainWindowAttribute as CFString, axWindow)
+                    AXUIElementSetAttributeValue(appRef, kAXFocusedWindowAttribute as CFString, axWindow)
+                    AXUIElementPerformAction(axWindow, kAXRaiseAction as CFString)
+                    return true
+                }
+            }
+            
+            return false
         }
         
-        // Fallback: match by title and bounds
-        for axWindow in axWindows {
-            var titleValue: AnyObject?
-            AXUIElementCopyAttributeValue(axWindow, kAXTitleAttribute as CFString, &titleValue)
-            let axTitle = titleValue as? String ?? ""
-            
-            if axTitle == window.title || window.title.contains(axTitle) {
-                AXUIElementPerformAction(axWindow, kAXRaiseAction as CFString)
-                return
+        // Try immediately
+        if !tryRaise() {
+            // Background / Electron apps may not expose their windows immediately after activation.
+            // Retry with increasing delays to ensure the window is successfully raised.
+            let delays = [0.05, 0.15, 0.3, 0.5]
+            for delay in delays {
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                    if tryRaise() {
+                        // Successfully raised, stop further retries if scheduled
+                        return
+                    }
+                }
             }
         }
     }
@@ -381,6 +407,16 @@ class WindowList {
             }
         }
         logAction("[exitFullScreen] No matching AX window found for id=\(window.id)")
+    }
+    
+    static func getActiveWindowID() -> CGWindowID? {
+        guard let frontmostApp = NSWorkspace.shared.frontmostApplication else { return nil }
+        let appRef = AXUIElementCreateApplication(frontmostApp.processIdentifier)
+        var windowValue: AnyObject?
+        guard AXUIElementCopyAttributeValue(appRef, kAXFocusedWindowAttribute as CFString, &windowValue) == .success else {
+            return nil
+        }
+        return getWindowID(from: windowValue as! AXUIElement)
     }
     
     private static func logAction(_ msg: String) {
