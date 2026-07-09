@@ -19,10 +19,52 @@ struct WindowInfo: Identifiable, Hashable {
     }
 }
 
+private func cleanTabTitle(_ title: String) -> String {
+    var clean = title
+    if let range = clean.range(of: " — ") {
+        clean = String(clean[..<range.lowerBound])
+    }
+    return clean.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+}
+
+private func selectTabIfNeeded(element: AXUIElement, targetTitle: String) -> Bool {
+    var roleVal: AnyObject?
+    if AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleVal) == .success,
+       let role = roleVal as? String {
+        if role == "AXRadioButton" || role == "AXTabButton" || role == "AXButton" || role.contains("Tab") {
+            var titleVal: AnyObject?
+            if AXUIElementCopyAttributeValue(element, kAXTitleAttribute as CFString, &titleVal) == .success,
+               let title = titleVal as? String {
+                let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty {
+                    let cleanTrimmed = cleanTabTitle(trimmed)
+                    let cleanTarget = cleanTabTitle(targetTitle)
+                    if cleanTrimmed == cleanTarget || cleanTarget.contains(cleanTrimmed) || cleanTrimmed.contains(cleanTarget) {
+                        AXUIElementPerformAction(element, kAXPressAction as CFString)
+                        return true
+                    }
+                }
+            }
+        }
+    }
+    
+    var childrenVal: AnyObject?
+    if AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &childrenVal) == .success,
+       let children = childrenVal as? [AXUIElement] {
+           for child in children {
+               if selectTabIfNeeded(element: child, targetTitle: targetTitle) {
+                   return true
+               }
+           }
+    }
+    return false
+}
+
 class WindowList {
     static func getWindows(showAllSpacesOverride: Bool? = nil, showMinimizedOverride: Bool? = nil) -> [WindowInfo] {
         // Gather onscreen Z-order rank from active space to sort raw lists in MRU order
         var onscreenZOrder: [CGWindowID: Int] = [:]
+        var seenBoundsForPID: [pid_t: Set<String>] = [:]
         let onscreenOptions = CGWindowListOption(arrayLiteral: .optionOnScreenOnly, .excludeDesktopElements)
         if let onscreenList = CGWindowListCopyWindowInfo(onscreenOptions, kCGNullWindowID) as? [[String: Any]] {
             for (index, info) in onscreenList.enumerated() {
@@ -210,6 +252,16 @@ class WindowList {
                 continue
             }
             
+            // Deduplicate tabs/overlapping windows of the same application
+            let boundsKey = "\(Int(bounds.origin.x)),\(Int(bounds.origin.y)),\(Int(bounds.width)),\(Int(bounds.height))"
+            if seenBoundsForPID[pid] == nil {
+                seenBoundsForPID[pid] = []
+            }
+            if seenBoundsForPID[pid]!.contains(boundsKey) {
+                continue
+            }
+            seenBoundsForPID[pid]!.insert(boundsKey)
+            
             // Space / minimized filter checks
             if !isOnscreen {
                 let minimized = isWindowMinimized(pid: pid, windowID: windowID)
@@ -369,7 +421,7 @@ class WindowList {
                 }
             }
             
-            // Fallback: match by title
+            // Fallback 1: match by title
             for axWindow in axWindows {
                 var titleValue: AnyObject?
                 AXUIElementCopyAttributeValue(axWindow, kAXTitleAttribute as CFString, &titleValue)
@@ -381,6 +433,36 @@ class WindowList {
                     AXUIElementPerformAction(axWindow, kAXRaiseAction as CFString)
                     return true
                 }
+            }
+            
+            // Fallback 2: Tab matching (find tab elements inside window and switch tabs)
+            for axWindow in axWindows {
+                if selectTabIfNeeded(element: axWindow, targetTitle: window.title) {
+                    var minimizedValue: AnyObject?
+                    if AXUIElementCopyAttributeValue(axWindow, kAXMinimizedAttribute as CFString, &minimizedValue) == .success,
+                       let isMin = minimizedValue as? Bool, isMin {
+                        AXUIElementSetAttributeValue(axWindow, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
+                    }
+                    
+                    AXUIElementSetAttributeValue(appRef, kAXMainWindowAttribute as CFString, axWindow)
+                    AXUIElementSetAttributeValue(appRef, kAXFocusedWindowAttribute as CFString, axWindow)
+                    AXUIElementPerformAction(axWindow, kAXRaiseAction as CFString)
+                    return true
+                }
+            }
+            
+            // Fallback 3: Raise the first window of the application to prevent silent failure
+            if let firstWindow = axWindows.first {
+                var minimizedValue: AnyObject?
+                if AXUIElementCopyAttributeValue(firstWindow, kAXMinimizedAttribute as CFString, &minimizedValue) == .success,
+                   let isMin = minimizedValue as? Bool, isMin {
+                    AXUIElementSetAttributeValue(firstWindow, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
+                }
+                
+                AXUIElementSetAttributeValue(appRef, kAXMainWindowAttribute as CFString, firstWindow)
+                AXUIElementSetAttributeValue(appRef, kAXFocusedWindowAttribute as CFString, firstWindow)
+                AXUIElementPerformAction(firstWindow, kAXRaiseAction as CFString)
+                return true
             }
             
             return false

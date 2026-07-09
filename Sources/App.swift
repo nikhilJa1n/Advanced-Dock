@@ -354,7 +354,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotkeyManagerDelegate {
     @objc func showOnboarding() {
         if let window = onboardingWindow {
             window.makeKeyAndOrderFront(nil)
-            NSApp.activate()
+            NSApp.activate(ignoringOtherApps: true)
             return
         }
         
@@ -372,7 +372,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotkeyManagerDelegate {
         
         self.onboardingWindow = window
         window.makeKeyAndOrderFront(nil)
-        NSApp.activate()
+        NSApp.activate(ignoringOtherApps: true)
     }
     
     @objc func quitApp() {
