@@ -1,5 +1,6 @@
 import Cocoa
 import CoreGraphics
+import ScreenCaptureKit
 
 struct WindowInfo: Identifiable, Hashable {
     let id: CGWindowID
@@ -291,12 +292,44 @@ class WindowList {
     }
     
     static func getThumbnail(for windowID: CGWindowID) -> CGImage? {
-        return CGWindowListCreateImage(
-            .null,
-            .optionIncludingWindow,
-            windowID,
-            [.boundsIgnoreFraming, .bestResolution]
-        )
+        var capturedImage: CGImage?
+        let semaphore = DispatchSemaphore(value: 0)
+        
+        SCShareableContent.getExcludingDesktopWindows(false, onScreenWindowsOnly: true) { content, error in
+            guard let content = content, error == nil else {
+                semaphore.signal()
+                return
+            }
+            
+            guard let scWindow = content.windows.first(where: { $0.windowID == windowID }) else {
+                semaphore.signal()
+                return
+            }
+            
+            let filter = SCContentFilter(desktopIndependentWindow: scWindow)
+            let config = SCStreamConfiguration()
+            config.showsCursor = false
+            config.width = 340
+            config.height = 212
+            
+            SCScreenshotManager.captureImage(contentFilter: filter, configuration: config) { image, err in
+                capturedImage = image
+                semaphore.signal()
+            }
+        }
+        
+        _ = semaphore.wait(timeout: .now() + 0.3)
+        
+        if capturedImage == nil {
+            capturedImage = CGWindowListCreateImage(
+                .null,
+                .optionIncludingWindow,
+                windowID,
+                [.boundsIgnoreFraming, .bestResolution]
+            )
+        }
+        
+        return capturedImage
     }
     
     static func raiseWindow(window: WindowInfo) {

@@ -179,6 +179,55 @@ struct SwitcherView: View {
         )
         .cornerRadius(24)
         .shadow(color: Color.black.opacity(0.6), radius: 24, x: 0, y: 12)
+        .overlay(
+            VStack {
+                HStack {
+                    Spacer()
+                    // System Resource Widget
+                    HStack(spacing: 12) {
+                        // CPU Usage Info
+                        HStack(spacing: 4) {
+                            Image(systemName: "cpu")
+                                .font(.system(size: 9))
+                                .foregroundColor(.blue)
+                            Text(String(format: "%.0f%%", appState.cpuUsage))
+                                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.8))
+                        }
+                        
+                        // RAM Usage Info
+                        HStack(spacing: 4) {
+                            Image(systemName: "memorychip")
+                                .font(.system(size: 9))
+                                .foregroundColor(.purple)
+                            
+                            let usedGB = appState.ramUsage.used / (1024 * 1024 * 1024)
+                            let totalGB = appState.ramUsage.total / (1024 * 1024 * 1024)
+                            Text(String(format: "%.1f/%.0fGB", usedGB, totalGB))
+                                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.8))
+                        }
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.black.opacity(0.25))
+                    .cornerRadius(8)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                    )
+                    .padding(.trailing, 16)
+                    .padding(.top, 16)
+                }
+                Spacer()
+            }
+        )
+        .onAppear {
+            appState.startStatsMonitoring()
+        }
+        .onDisappear {
+            appState.stopStatsMonitoring()
+        }
     }
 }
 

@@ -60,6 +60,9 @@ class AppState: ObservableObject {
     
     @Published var isRecordingShortcut = false
     
+    @Published var cpuUsage: Double = 0.0
+    @Published var ramUsage: (used: Double, total: Double) = (0.0, 16.0 * 1024 * 1024 * 1024)
+    
     private var timer: AnyCancellable?
     
     init() {
@@ -124,6 +127,79 @@ class AppState: ObservableObject {
             }
         }
         return uniqueApps.sorted(by: { $0.name.lowercased() < $1.name.lowercased() })
+    }
+    
+    private var statsTimer: Timer?
+    private var lastCPUTicks: (active: Double, total: Double)?
+    
+    func startStatsMonitoring() {
+        statsTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
+            self?.updateStats()
+        }
+        updateStats()
+    }
+    
+    func stopStatsMonitoring() {
+        statsTimer?.invalidate()
+        statsTimer = nil
+    }
+    
+    private func updateStats() {
+        // CPU
+        var cpuInfo = host_cpu_load_info()
+        var count = mach_msg_type_number_t(MemoryLayout<host_cpu_load_info>.size / MemoryLayout<integer_t>.size)
+        let kerr = withUnsafeMutablePointer(to: &cpuInfo) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                host_statistics(mach_host_self(), HOST_CPU_LOAD_INFO, $0, &count)
+            }
+        }
+        
+        if kerr == KERN_SUCCESS {
+            let user = Double(cpuInfo.cpu_ticks.0)
+            let system = Double(cpuInfo.cpu_ticks.1)
+            let idle = Double(cpuInfo.cpu_ticks.2)
+            let nice = Double(cpuInfo.cpu_ticks.3)
+            let active = user + system + nice
+            let total = active + idle
+            
+            if let last = lastCPUTicks {
+                let diffActive = active - last.active
+                let diffTotal = total - last.total
+                if diffTotal > 0 {
+                    self.cpuUsage = (diffActive / diffTotal) * 100.0
+                }
+            }
+            lastCPUTicks = (active, total)
+        }
+        
+        // RAM
+        var stats = host_basic_info()
+        var basicCount = mach_msg_type_number_t(MemoryLayout<host_basic_info>.size / MemoryLayout<integer_t>.size)
+        let basicKerr = withUnsafeMutablePointer(to: &stats) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(basicCount)) {
+                host_info(mach_host_self(), HOST_BASIC_INFO, $0, &basicCount)
+            }
+        }
+        
+        var vmStats = vm_statistics64()
+        var vmCount = mach_msg_type_number_t(MemoryLayout<vm_statistics64>.size / MemoryLayout<integer_t>.size)
+        let vmKerr = withUnsafeMutablePointer(to: &vmStats) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(vmCount)) {
+                host_statistics64(mach_host_self(), HOST_VM_INFO64, $0, &vmCount)
+            }
+        }
+        
+        if basicKerr == KERN_SUCCESS && vmKerr == KERN_SUCCESS {
+            let totalMemory = Double(stats.max_mem)
+            let pageSize = Double(vm_kernel_page_size)
+            let free = Double(vmStats.free_count) * pageSize
+            let inactive = Double(vmStats.inactive_count) * pageSize
+            let speculative = Double(vmStats.speculative_count) * pageSize
+            
+            let available = free + inactive + speculative
+            let used = totalMemory - available
+            self.ramUsage = (used, totalMemory)
+        }
     }
 }
 

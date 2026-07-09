@@ -33,6 +33,8 @@ Built natively in Swift and SwiftUI, AdvancedDock runs as a highly efficient bac
 ### 3. Personalization & Control
 *   **Customizable Hotkeys**: Record your own global activation shortcut (e.g. `⌥ + Space` or `⌘ + Tab`) via the settings shortcut recorder.
 *   **App Exclusions Blocklist**: Prevent specific applications from showing up in the switcher HUD cycle.
+*   **Modern ScreenCaptureKit Previews**: Uses Apple's modern, performant `ScreenCaptureKit` API for capturing window thumbnails, reducing cpu load and removing legacy warnings.
+*   **Live Resource Widget**: Real-time glassmorphic CPU and RAM statistics monitor located in the top-right corner of the switcher HUD.
 ---
 
 ## 📸 Preview & Aesthetics
