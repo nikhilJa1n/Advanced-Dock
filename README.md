@@ -33,7 +33,6 @@ Built natively in Swift and SwiftUI, AdvancedDock runs as a highly efficient bac
 ### 3. Personalization & Control
 *   **Customizable Hotkeys**: Record your own global activation shortcut (e.g. `⌥ + Space` or `⌘ + Tab`) via the settings shortcut recorder.
 *   **App Exclusions Blocklist**: Prevent specific applications from showing up in the switcher HUD cycle.
-*   **Window Stacking & Grouping**: Group multiple windows from the same application into a visual "stacked deck" containing a count badge. Hovering or navigating onto the stack fans the cards out horizontally inline with smooth spring physics.
 ---
 
 ## 📸 Preview & Aesthetics
