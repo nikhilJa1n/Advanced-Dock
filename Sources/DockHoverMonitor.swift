@@ -27,7 +27,7 @@ class DockHoverMonitor {
         
         findDockPID()
         
-        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+        timer = Timer.scheduledTimer(withTimeInterval: 0.03, repeats: true) { [weak self] _ in
             self?.checkMousePosition()
         }
     }

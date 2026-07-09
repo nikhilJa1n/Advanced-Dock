@@ -104,6 +104,7 @@ class WindowList {
         // Build set of valid window IDs and cache titles using accessibility tree of regular applications
         var validAXWindowIDs: Set<CGWindowID> = []
         var axWindowTitles: [CGWindowID: String] = [:]
+        var axMinimizedStates: [CGWindowID: Bool] = [:]
         for app in NSWorkspace.shared.runningApplications {
             if app.activationPolicy == .regular {
                 let appRef = AXUIElementCreateApplication(app.processIdentifier)
@@ -157,6 +158,15 @@ class WindowList {
                             if !trimmed.isEmpty {
                                 axWindowTitles[id] = trimmed
                             }
+                        }
+                        
+                        // Retrieve minimized state
+                        var minimizedValue: AnyObject?
+                        if AXUIElementCopyAttributeValue(axWindow, kAXMinimizedAttribute as CFString, &minimizedValue) == .success,
+                           let minBool = minimizedValue as? Bool {
+                            axMinimizedStates[id] = minBool
+                        } else {
+                            axMinimizedStates[id] = false
                         }
                     }
                 }
@@ -236,7 +246,7 @@ class WindowList {
                     title = ownerName
                 } else {
                     // Keep empty titles only if we are querying other spaces (showAllSpaces is true) or if the window is minimized.
-                    let minimized = !isOnscreen && isWindowMinimized(pid: pid, windowID: windowID)
+                    let minimized = !isOnscreen && (axMinimizedStates[windowID] ?? false)
                     if showAllSpaces || (minimized && showMinimized) {
                         // For windows on other spaces (showAllSpaces is true), filter out small helper windows by requiring a large size.
                         if !minimized {
@@ -258,7 +268,7 @@ class WindowList {
             
             // Space / minimized filter checks
             if !isOnscreen {
-                let minimized = isWindowMinimized(pid: pid, windowID: windowID)
+                let minimized = axMinimizedStates[windowID] ?? false
                 
                 if minimized {
                     if !showMinimized {
@@ -359,16 +369,13 @@ class WindowList {
         cacheLock.unlock()
         
         var capturedImage: CGImage?
-        let semaphore = DispatchSemaphore(value: 0)
         
-        SCShareableContent.getExcludingDesktopWindows(false, onScreenWindowsOnly: false) { content, error in
-            guard let content = content, error == nil else {
-                semaphore.signal()
-                return
-            }
-            
-            guard let scWindow = content.windows.first(where: { $0.windowID == windowID }) else {
-                semaphore.signal()
+        // Fast Path: Try capturing with onScreenWindowsOnly: true (very fast, covers active space)
+        let semFast = DispatchSemaphore(value: 0)
+        SCShareableContent.getExcludingDesktopWindows(false, onScreenWindowsOnly: true) { content, error in
+            guard let content = content, error == nil,
+                  let scWindow = content.windows.first(where: { $0.windowID == windowID }) else {
+                semFast.signal()
                 return
             }
             
@@ -380,11 +387,34 @@ class WindowList {
             
             SCScreenshotManager.captureImage(contentFilter: filter, configuration: config) { image, err in
                 capturedImage = image
-                semaphore.signal()
+                semFast.signal()
             }
         }
+        _ = semFast.wait(timeout: .now() + 0.15)
         
-        _ = semaphore.wait(timeout: .now() + 0.8)
+        // Slow Path: Fallback to capturing with onScreenWindowsOnly: false (covers minimized / other spaces)
+        if capturedImage == nil {
+            let semSlow = DispatchSemaphore(value: 0)
+            SCShareableContent.getExcludingDesktopWindows(false, onScreenWindowsOnly: false) { content, error in
+                guard let content = content, error == nil,
+                      let scWindow = content.windows.first(where: { $0.windowID == windowID }) else {
+                    semSlow.signal()
+                    return
+                }
+                
+                let filter = SCContentFilter(desktopIndependentWindow: scWindow)
+                let config = SCStreamConfiguration()
+                config.showsCursor = false
+                config.width = 340
+                config.height = 212
+                
+                SCScreenshotManager.captureImage(contentFilter: filter, configuration: config) { image, err in
+                    capturedImage = image
+                    semSlow.signal()
+                }
+            }
+            _ = semSlow.wait(timeout: .now() + 0.65)
+        }
         
         if capturedImage == nil {
             capturedImage = CGWindowListCreateImage(

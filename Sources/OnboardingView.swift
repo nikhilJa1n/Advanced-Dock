@@ -92,7 +92,7 @@ class AppState: ObservableObject {
         }
         
         let delayVal = UserDefaults.standard.double(forKey: "dockHoverDelay")
-        self.dockHoverDelay = delayVal == 0 ? 0.4 : delayVal
+        self.dockHoverDelay = delayVal == 0 ? 0.15 : delayVal
         
         checkPermissions()
         startPermissionPolling()
@@ -110,7 +110,7 @@ class AppState: ObservableObject {
         self.hotkeyKeyCode = 48
         self.hotkeyModifiers = 2
         self.excludedApps = []
-        self.dockHoverDelay = 0.4
+        self.dockHoverDelay = 0.15
         
         UserDefaults.standard.removeObject(forKey: "enableArrowNavigation")
         UserDefaults.standard.removeObject(forKey: "enableHoverSwitch")
