@@ -35,7 +35,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotkeyManagerDelegate {
         
         // Setup Dock Previews
         dockPreviewWindow = DockPreviewWindow()
-        dockHoverMonitor = DockHoverMonitor(delegate: self)
+        dockHoverMonitor = DockHoverMonitor(delegate: self, appState: appState)
         dockHoverMonitor?.previewWindowFrameProvider = { [weak self] in
             guard let self = self, let previewWin = self.dockPreviewWindow, previewWin.isVisible else {
                 return nil

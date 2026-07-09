@@ -8,13 +8,16 @@ protocol DockHoverMonitorDelegate: AnyObject {
 
 class DockHoverMonitor {
     weak var delegate: DockHoverMonitorDelegate?
+    let appState: AppState
     var previewWindowFrameProvider: (() -> CGRect?)?
     private var timer: Timer?
     private var currentHoveredApp: String?
     private var activeDockPID: pid_t?
+    private var hoverDelayWorkItem: DispatchWorkItem?
     
-    init(delegate: DockHoverMonitorDelegate) {
+    init(delegate: DockHoverMonitorDelegate, appState: AppState) {
         self.delegate = delegate
+        self.appState = appState
     }
     
     func start() {
@@ -116,23 +119,34 @@ class DockHoverMonitor {
         
         if let item = hoveredItem {
             if currentHoveredApp != item.title {
-                logMessage("[DockHoverMonitor] Hovered app changed to '\(item.title)'")
-                currentHoveredApp = item.title
-                // Convert frame to Cocoa coordinates for window positioning
+                hoverDelayWorkItem?.cancel()
+                
+                let appName = item.title
                 let cocoaFrame = CGRect(
                     x: item.frame.origin.x,
                     y: screenHeight - item.frame.origin.y - item.frame.size.height,
                     width: item.frame.size.width,
                     height: item.frame.size.height
                 )
-                delegate?.dockHoverMonitorDidHover(appName: item.title, itemFrame: cocoaFrame)
+                
+                let delay = appState.dockHoverDelay
+                let workItem = DispatchWorkItem { [weak self] in
+                    guard let self = self else { return }
+                    self.logMessage("[DockHoverMonitor] Hover delay fired for '\(appName)'")
+                    self.currentHoveredApp = appName
+                    self.delegate?.dockHoverMonitorDidHover(appName: appName, itemFrame: cocoaFrame)
+                }
+                self.hoverDelayWorkItem = workItem
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
             }
         } else {
             // Check if mouse is currently inside the preview window
             if let frame = previewWindowFrameProvider?(), frame.contains(mouseLoc) {
-                // Keep the hover state alive
                 return
             }
+            
+            hoverDelayWorkItem?.cancel()
+            hoverDelayWorkItem = nil
             
             if currentHoveredApp != nil {
                 logMessage("[DockHoverMonitor] Hover dismissed (currentHoveredApp was '\(currentHoveredApp!)')")

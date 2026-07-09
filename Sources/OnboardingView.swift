@@ -63,6 +63,10 @@ class AppState: ObservableObject {
     @Published var cpuUsage: Double = 0.0
     @Published var ramUsage: (used: Double, total: Double) = (0.0, 16.0 * 1024 * 1024 * 1024)
     
+    @Published var dockHoverDelay: Double {
+        didSet { UserDefaults.standard.set(dockHoverDelay, forKey: "dockHoverDelay") }
+    }
+    
     private var timer: AnyCancellable?
     
     init() {
@@ -87,8 +91,39 @@ class AppState: ObservableObject {
             self.excludedApps = []
         }
         
+        let delayVal = UserDefaults.standard.double(forKey: "dockHoverDelay")
+        self.dockHoverDelay = delayVal == 0 ? 0.4 : delayVal
+        
         checkPermissions()
         startPermissionPolling()
+    }
+    
+    func resetToDefaults() {
+        self.enableArrowNavigation = true
+        self.enableHoverSwitch = false
+        self.thumbnailScale = 1.0
+        self.showMinimized = true
+        self.showAllSpaces = false
+        self.windowSortOrder = "Recently Used"
+        self.enableDockHoverPreviews = true
+        self.dockHoverThumbnailScale = 1.0
+        self.hotkeyKeyCode = 48
+        self.hotkeyModifiers = 2
+        self.excludedApps = []
+        self.dockHoverDelay = 0.4
+        
+        UserDefaults.standard.removeObject(forKey: "enableArrowNavigation")
+        UserDefaults.standard.removeObject(forKey: "enableHoverSwitch")
+        UserDefaults.standard.removeObject(forKey: "thumbnailScale")
+        UserDefaults.standard.removeObject(forKey: "showMinimized")
+        UserDefaults.standard.removeObject(forKey: "showAllSpaces")
+        UserDefaults.standard.removeObject(forKey: "windowSortOrder")
+        UserDefaults.standard.removeObject(forKey: "enableDockHoverPreviews")
+        UserDefaults.standard.removeObject(forKey: "dockHoverThumbnailScale")
+        UserDefaults.standard.removeObject(forKey: "hotkeyKeyCode")
+        UserDefaults.standard.removeObject(forKey: "hotkeyModifiers")
+        UserDefaults.standard.removeObject(forKey: "excludedApps")
+        UserDefaults.standard.removeObject(forKey: "dockHoverDelay")
     }
     
     func checkPermissions() {
@@ -244,14 +279,20 @@ struct OnboardingView: View {
                 
                 // Navigation Items
                 VStack(spacing: 8) {
-                    SidebarButton(title: "Setup & Permissions", icon: "shield.righthalf.filled", isSelected: selectedTab == 0) {
+                    SidebarButton(title: "General Preferences", icon: "slider.horizontal.3", isSelected: selectedTab == 0) {
                         selectedTab = 0
                     }
-                    SidebarButton(title: "Shortcut Tester", icon: "keyboard", isSelected: selectedTab == 1) {
+                    SidebarButton(title: "Dock Previews", icon: "dock.rectangle", isSelected: selectedTab == 1) {
                         selectedTab = 1
                     }
-                    SidebarButton(title: "How to Use", icon: "questionmark.circle", isSelected: selectedTab == 2) {
+                    SidebarButton(title: "Hotkeys & Exclusions", icon: "keyboard.badge.ellipsis", isSelected: selectedTab == 2) {
                         selectedTab = 2
+                    }
+                    SidebarButton(title: "System Diagnostics", icon: "heart.text.square.fill", isSelected: selectedTab == 3) {
+                        selectedTab = 3
+                    }
+                    SidebarButton(title: "How to Use", icon: "questionmark.circle", isSelected: selectedTab == 4) {
+                        selectedTab = 4
                     }
                 }
                 
@@ -288,7 +329,7 @@ struct OnboardingView: View {
                 }
             }
             .padding(24)
-            .frame(width: 210)
+            .frame(width: 220)
             .background(Color(nsColor: .windowBackgroundColor).opacity(0.4))
             
             Divider()
@@ -296,9 +337,13 @@ struct OnboardingView: View {
             // Detail / Content Area
             VStack {
                 if selectedTab == 0 {
-                    PermissionsTab(state: state)
+                    GeneralTab(state: state)
                 } else if selectedTab == 1 {
-                    TesterTab(state: state)
+                    DockPreviewsTab(state: state)
+                } else if selectedTab == 2 {
+                    ExclusionsTab(state: state)
+                } else if selectedTab == 3 {
+                    DiagnosticsTab(state: state)
                 } else {
                     HelpTab()
                 }
@@ -306,7 +351,7 @@ struct OnboardingView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(nsColor: .windowBackgroundColor))
         }
-        .frame(width: 660, height: 460)
+        .frame(width: 780, height: 520)
         .preferredColorScheme(.dark)
         .overlay(
             Group {
@@ -348,272 +393,180 @@ struct SidebarButton: View {
 }
 
 // Permissions View
-struct PermissionsTab: View {
+struct GeneralTab: View {
     @ObservedObject var state: AppState
     
     var body: some View {
-        ScrollView(.vertical, showsIndicators: true) {
-            VStack(alignment: .leading, spacing: 20) {
-                Text("Permissions Configuration")
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 18) {
+                Text("General Preferences")
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
+                    .padding(.bottom, 4)
                 
-                Text("To display window switcher cards and intercept the **Option + Tab** shortcut, the application requires the following system permissions:")
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundColor(.white.opacity(0.7))
-                    .lineSpacing(4)
-                
-                VStack(spacing: 14) {
-                    // Accessibility Permission Card
-                    PermissionCard(
-                        title: "Accessibility Permission",
-                        description: "Enables keyboard interception (Option+Tab) and window focusing controls.",
-                        isGranted: state.isAccessibilityGranted,
-                        action: { Permissions.requestAccessibility() }
+                VStack(alignment: .leading, spacing: 14) {
+                    ToggleRow(
+                        title: "Enable Arrow Key Navigation",
+                        description: "Cycle through cards using Left (←) / Right (→) arrow keys.",
+                        isOn: $state.enableArrowNavigation
                     )
                     
-                    // Screen Recording Permission Card
-                    PermissionCard(
-                        title: "Screen & Window Recording",
-                        description: "Enables taking visual screenshots of active windows to show as thumbnails.",
-                        isGranted: state.isScreenRecordingGranted,
-                        action: { Permissions.requestScreenRecording() }
+                    Divider()
+                    
+                    ToggleRow(
+                        title: "Enable Mouse Hover Switch",
+                        description: "Highlight window cards automatically when hovering the mouse cursor.",
+                        isOn: $state.enableHoverSwitch
                     )
-                }
-                
-                if state.isAccessibilityGranted && state.isScreenRecordingGranted {
-                    HStack(spacing: 10) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
-                            .font(.system(size: 18))
-                        Text("All systems configured! The window switcher is active.")
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundColor(.white.opacity(0.9))
-                    }
-                    .padding(.vertical, 10)
-                } else {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(alignment: .top, spacing: 8) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundColor(.orange)
-                                .font(.system(size: 14))
-                                .padding(.top, 1)
-                            
-                            Text("Permission issues after app update?")
+                    
+                    Divider()
+                    
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("Thumbnail Card Size")
                                 .font(.system(size: 12, weight: .bold, design: .rounded))
                                 .foregroundColor(.white)
+                            Spacer()
+                            Text(String(format: "%.0f%%", state.thumbnailScale * 100))
+                                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                .foregroundColor(.blue)
                         }
-                        
-                        Text("If you previously granted permissions but they now show as missing, macOS has cached the old signature. Go to **System Settings > Privacy & Security > Accessibility**, select **AdvancedDock**, click the **minus (–)** button to delete it, and relaunch the app to re-register it. If that fails, restart the app after toggling.")
-                            .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .foregroundColor(.white.opacity(0.6))
-                            .lineSpacing(3)
-                            .padding(.leading, 22)
+                        Slider(value: $state.thumbnailScale, in: 0.7...1.4, step: 0.05)
+                            .accentColor(.blue)
                     }
-                    .padding(12)
-                    .background(Color.orange.opacity(0.08))
-                    .cornerRadius(10)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color.orange.opacity(0.2), lineWidth: 1)
-                    )
-                    .padding(.top, 4)
-                }
-                               // Preferences & Behavior Section
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Preferences & Behavior")
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
                     
-                    VStack(alignment: .leading, spacing: 14) {
-                        // Arrow navigation toggle
-                        ToggleRow(
-                            title: "Enable Arrow Key Navigation",
-                            description: "Cycle through cards using Left (←) / Right (→) arrow keys.",
-                            isOn: $state.enableArrowNavigation
-                        )
+                    Divider()
+                    
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Window Cycle Filtering")
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
                         
+                        HStack(spacing: 20) {
+                            Toggle("Minimized Apps", isOn: $state.showMinimized)
+                                .toggleStyle(CheckboxToggleStyle())
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(.white.opacity(0.8))
+                            
+                            Toggle("All Desktop Spaces", isOn: $state.showAllSpaces)
+                                .toggleStyle(CheckboxToggleStyle())
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(.white.opacity(0.8))
+                        }
+                    }
+                    
+                    Divider()
+                    
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Thumbnail Sort Order")
+                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                                .foregroundColor(.white)
+                            Text("Determines the order cards appear in the HUD switcher.")
+                                .font(.system(size: 10, weight: .regular, design: .rounded))
+                                .foregroundColor(.white.opacity(0.55))
+                        }
+                        Spacer()
+                        Picker("", selection: $state.windowSortOrder) {
+                            Text("Recently Used").tag("Recently Used")
+                                .font(.system(size: 11, weight: .medium))
+                            Text("App Name").tag("App Name")
+                                .font(.system(size: 11, weight: .medium))
+                            Text("Window Title").tag("Window Title")
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .pickerStyle(MenuPickerStyle())
+                    }
+                    
+                    Divider()
+                    
+                    // Reset to Defaults Button
+                    HStack {
+                        Spacer()
+                        Button(action: {
+                            state.resetToDefaults()
+                        }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "arrow.counterclockwise.circle.fill")
+                                Text("Reset to Defaults")
+                            }
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Color.red.opacity(0.2))
+                            .cornerRadius(6)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(Color.red.opacity(0.5), lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                    .padding(.top, 8)
+                }
+                .padding(14)
+                .background(Color.white.opacity(0.04))
+                .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                )
+            }
+            .padding(20)
+        }
+    }
+}
+
+struct DockPreviewsTab: View {
+    @ObservedObject var state: AppState
+    
+    var body: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 18) {
+                Text("Dock Previews Settings")
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                    .padding(.bottom, 4)
+                
+                VStack(alignment: .leading, spacing: 16) {
+                    ToggleRow(
+                        title: "Enable Dock Hover Previews",
+                        description: "Show miniature window grids when hovering your mouse over Dock application icons.",
+                        isOn: $state.enableDockHoverPreviews
+                    )
+                    
+                    if state.enableDockHoverPreviews {
                         Divider()
                         
-                        // Hover Selection Toggle
-                        ToggleRow(
-                            title: "Enable Mouse Hover Switch",
-                            description: "Highlight window cards automatically when hovering the mouse cursor.",
-                            isOn: $state.enableHoverSwitch
-                        )
-                        
-                        Divider()
-                        
-                        // Thumbnail Scaling Slider
                         VStack(alignment: .leading, spacing: 6) {
                             HStack {
-                                Text("Thumbnail Card Size")
+                                Text("Dock Hover Card Size")
                                     .font(.system(size: 12, weight: .bold, design: .rounded))
                                     .foregroundColor(.white)
                                 Spacer()
-                                Text(String(format: "%.0f%%", state.thumbnailScale * 100))
+                                Text(String(format: "%.0f%%", state.dockHoverThumbnailScale * 100))
                                     .font(.system(size: 11, weight: .semibold, design: .monospaced))
                                     .foregroundColor(.blue)
                             }
-                            
-                            Slider(value: $state.thumbnailScale, in: 0.7...1.4, step: 0.05)
+                            Slider(value: $state.dockHoverThumbnailScale, in: 0.7...2.0, step: 0.05)
                                 .accentColor(.blue)
                         }
                         
                         Divider()
                         
-                        // Filter & Preview Options
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("Workspace & Dock Options")
-                                .font(.system(size: 12, weight: .bold, design: .rounded))
-                                .foregroundColor(.white)
-                            
-                            HStack(spacing: 20) {
-                                Toggle("Minimized Apps", isOn: $state.showMinimized)
-                                    .toggleStyle(CheckboxToggleStyle())
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.8))
-                                
-                                Toggle("All Desktop Spaces", isOn: $state.showAllSpaces)
-                                    .toggleStyle(CheckboxToggleStyle())
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.8))
-                            }
-                            
-                            Toggle("Enable Dock Hover Previews", isOn: $state.enableDockHoverPreviews)
-                                .toggleStyle(CheckboxToggleStyle())
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(.white.opacity(0.8))
-                            
-                            if state.enableDockHoverPreviews {
-                                VStack(alignment: .leading, spacing: 6) {
-                                    HStack {
-                                        Text("Dock Hover Thumbnail Size")
-                                            .font(.system(size: 11, weight: .bold, design: .rounded))
-                                            .foregroundColor(.white.opacity(0.9))
-                                        Spacer()
-                                        Text(String(format: "%.0f%%", state.dockHoverThumbnailScale * 100))
-                                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                                            .foregroundColor(.blue)
-                                    }
-                                    .padding(.leading, 20)
-                                    
-                                    Slider(value: $state.dockHoverThumbnailScale, in: 0.7...2.0, step: 0.05)
-                                        .accentColor(.blue)
-                                        .padding(.leading, 20)
-                                }
-                                .padding(.top, 4)
-                            }
-                        }
-                        
-                        Divider()
-                        
-                        // Window Sorting Picker
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Thumbnail Sort Order")
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text("Dock Hover Activation Delay")
                                     .font(.system(size: 12, weight: .bold, design: .rounded))
                                     .foregroundColor(.white)
-                                Text("Determines the order cards appear in the HUD switcher.")
-                                    .font(.system(size: 10, weight: .regular, design: .rounded))
-                                    .foregroundColor(.white.opacity(0.55))
+                                Spacer()
+                                Text(String(format: "%.2fs", state.dockHoverDelay))
+                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                    .foregroundColor(.blue)
                             }
-                            Spacer()
-                            Picker("", selection: $state.windowSortOrder) {
-                                Text("Recently Used").tag("Recently Used")
-                                    .font(.system(size: 11, weight: .medium))
-                                Text("App Name").tag("App Name")
-                                    .font(.system(size: 11, weight: .medium))
-                                Text("Window Title").tag("Window Title")
-                                    .font(.system(size: 11, weight: .medium))
-                            }
-                            .pickerStyle(MenuPickerStyle())
-                        }
-                        
-                        Divider()
-                        
-                        // Hotkey Shortcut Recorder
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("App Switcher Shortcut")
-                                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                                    .foregroundColor(.white)
-                                Text("Click to record a custom shortcut to trigger the switcher HUD.")
-                                    .font(.system(size: 10, weight: .regular, design: .rounded))
-                                    .foregroundColor(.white.opacity(0.55))
-                            }
-                            Spacer()
-                            
-                            Button(action: {
-                                state.isRecordingShortcut = true
-                            }) {
-                                Text(state.isRecordingShortcut ? "Press Keys (Esc to Cancel)..." : hotkeyString(keyCode: state.hotkeyKeyCode, modifiers: state.hotkeyModifiers))
-                                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 6)
-                                    .background(state.isRecordingShortcut ? Color.red.opacity(0.3) : Color.blue.opacity(0.2))
-                                    .cornerRadius(6)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 6)
-                                            .stroke(state.isRecordingShortcut ? Color.red : Color.blue, lineWidth: 1)
-                                    )
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                        }
-                        
-                        Divider()
-                        
-                        // App Exclusions list
-                        VStack(alignment: .leading, spacing: 8) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Excluded Applications")
-                                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                                    .foregroundColor(.white)
-                                Text("Select apps that should never appear in the switcher HUD cycle.")
-                                    .font(.system(size: 10, weight: .regular, design: .rounded))
-                                    .foregroundColor(.white.opacity(0.55))
-                            }
-                            
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 12) {
-                                    ForEach(state.getRunningApps()) { app in
-                                        let isExcluded = state.excludedApps.contains(app.name)
-                                        Button(action: {
-                                            if isExcluded {
-                                                state.excludedApps.remove(app.name)
-                                            } else {
-                                                state.excludedApps.insert(app.name)
-                                            }
-                                        }) {
-                                            HStack(spacing: 6) {
-                                                if let icon = app.icon {
-                                                    Image(nsImage: icon)
-                                                        .resizable()
-                                                        .frame(width: 16, height: 16)
-                                                }
-                                                Text(app.name)
-                                                    .font(.system(size: 10, weight: .medium))
-                                                    .foregroundColor(isExcluded ? .white.opacity(0.4) : .white)
-                                                
-                                                Image(systemName: isExcluded ? "square" : "checkmark.square.fill")
-                                                    .foregroundColor(isExcluded ? .white.opacity(0.3) : .blue)
-                                                    .font(.system(size: 10))
-                                            }
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 4)
-                                            .background(isExcluded ? Color.white.opacity(0.04) : Color.blue.opacity(0.12))
-                                            .cornerRadius(6)
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 6)
-                                                    .stroke(isExcluded ? Color.white.opacity(0.08) : Color.blue.opacity(0.3), lineWidth: 1)
-                                            )
-                                        }
-                                        .buttonStyle(PlainButtonStyle())
-                                    }
-                                }
-                                .padding(.vertical, 4)
-                            }
+                            Slider(value: $state.dockHoverDelay, in: 0.1...1.5, step: 0.05)
+                                .accentColor(.blue)
                         }
                     }
                 }
@@ -624,11 +577,164 @@ struct PermissionsTab: View {
                     RoundedRectangle(cornerRadius: 12)
                         .stroke(Color.white.opacity(0.08), lineWidth: 1)
                 )
-                .padding(.top, 8)
-                
-                Spacer()
             }
-            .padding(24)
+            .padding(20)
+        }
+    }
+}
+
+struct ExclusionsTab: View {
+    @ObservedObject var state: AppState
+    @State private var searchText = ""
+    
+    var filteredApps: [RunningAppInfo] {
+        let allApps = state.getRunningApps()
+        if searchText.isEmpty {
+            return allApps
+        } else {
+            return allApps.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+        }
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text("Hotkeys & App Exclusions")
+                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .foregroundColor(.white)
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
+            
+            VStack(alignment: .leading, spacing: 14) {
+                // Hotkey section
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("App Switcher Trigger Key")
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                        Text("Click input to record your own custom hotkey combination.")
+                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .foregroundColor(.white.opacity(0.55))
+                    }
+                    Spacer()
+                    
+                    Button(action: {
+                        state.isRecordingShortcut = true
+                    }) {
+                        Text(state.isRecordingShortcut ? "Press Keys (Esc to Cancel)..." : hotkeyString(keyCode: state.hotkeyKeyCode, modifiers: state.hotkeyModifiers))
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(state.isRecordingShortcut ? Color.red.opacity(0.3) : Color.blue.opacity(0.2))
+                            .cornerRadius(6)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(state.isRecordingShortcut ? Color.red : Color.blue, lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+                
+                Divider()
+                
+                // Exclusions search input
+                VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("App Cycle Exclusions")
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                        Text("Select applications to skip when cycling window cards.")
+                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .foregroundColor(.white.opacity(0.55))
+                    }
+                    
+                    // Search bar
+                    HStack(spacing: 8) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 11))
+                            .foregroundColor(.white.opacity(0.4))
+                        TextField("Search running applications...", text: $searchText)
+                            .textFieldStyle(PlainTextFieldStyle())
+                            .font(.system(size: 11))
+                            .foregroundColor(.white)
+                        
+                        if !searchText.isEmpty {
+                            Button(action: { searchText = "" }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.white.opacity(0.4))
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color.white.opacity(0.04))
+                    .cornerRadius(8)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                    )
+                    
+                    // Filtered list
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            if filteredApps.isEmpty {
+                                Text("No running apps found")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.4))
+                                    .padding(.vertical, 6)
+                            } else {
+                                ForEach(filteredApps) { app in
+                                    let isExcluded = state.excludedApps.contains(app.name)
+                                    Button(action: {
+                                        if isExcluded {
+                                            state.excludedApps.remove(app.name)
+                                        } else {
+                                            state.excludedApps.insert(app.name)
+                                        }
+                                    }) {
+                                        HStack(spacing: 6) {
+                                            if let icon = app.icon {
+                                                Image(nsImage: icon)
+                                                    .resizable()
+                                                    .frame(width: 16, height: 16)
+                                            }
+                                            Text(app.name)
+                                                .font(.system(size: 10, weight: .medium))
+                                                .foregroundColor(isExcluded ? .white.opacity(0.4) : .white)
+                                            
+                                            Image(systemName: isExcluded ? "square" : "checkmark.square.fill")
+                                                .foregroundColor(isExcluded ? .white.opacity(0.3) : .blue)
+                                                .font(.system(size: 10))
+                                        }
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(isExcluded ? Color.white.opacity(0.04) : Color.blue.opacity(0.12))
+                                        .cornerRadius(6)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 6)
+                                                .stroke(isExcluded ? Color.white.opacity(0.08) : Color.blue.opacity(0.3), lineWidth: 1)
+                                        )
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                }
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+            }
+            .padding(14)
+            .background(Color.white.opacity(0.04))
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            )
+            .padding(.horizontal, 20)
+            
+            Spacer()
         }
     }
 }
@@ -694,47 +800,170 @@ struct PermissionCard: View {
 }
 
 // Shortcut Tester View
-struct TesterTab: View {
+struct DiagnosticsTab: View {
     @ObservedObject var state: AppState
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("Interactive Shortcut Tester")
-                .font(.system(size: 18, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
-            
-            Text("Hold the Option key and tap Tab on your keyboard. The visual keys below will glow in real-time if the event tap is active and capturing keys.")
-                .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundColor(.white.opacity(0.7))
-                .lineSpacing(4)
-            
-            Spacer()
-            
-            // Visual Keyboard Keys
-            HStack(spacing: 24) {
-                Spacer()
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 18) {
+                Text("System Diagnostics & Monitoring")
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                    .padding(.bottom, 4)
                 
-                // Option Key
-                KeyCapView(
-                    label: "Option ⌥",
-                    isPressed: state.isOptionKeyPressed,
-                    gradientColors: [Color.blue, Color.cyan]
+                // Real-Time Resource Meters
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Real-Time Host Telemetry")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                    
+                    SystemResourceMeter(
+                        title: "CPU Utilization",
+                        value: state.cpuUsage,
+                        maxVal: 100.0,
+                        label: String(format: "%.1f%%", state.cpuUsage),
+                        color: .blue
+                    )
+                    
+                    let usedGB = state.ramUsage.used / (1024 * 1024 * 1024)
+                    let totalGB = state.ramUsage.total / (1024 * 1024 * 1024)
+                    SystemResourceMeter(
+                        title: "Physical RAM Allocation",
+                        value: usedGB,
+                        maxVal: totalGB,
+                        label: String(format: "%.1f / %.0f GB", usedGB, totalGB),
+                        color: .purple
+                    )
+                }
+                .padding(14)
+                .background(Color.white.opacity(0.04))
+                .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
                 )
                 
-                // Tab Key
-                KeyCapView(
-                    label: "Tab ⇥",
-                    isPressed: state.isTabKeyPressed,
-                    gradientColors: [Color.purple, Color.pink]
+                // System Permissions Status
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("System Accessibility Rights")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                    
+                    PermissionCard(
+                        title: "Accessibility API Access",
+                        description: "Required to capture custom hotkeys and trigger desktop window actions.",
+                        isGranted: state.isAccessibilityGranted,
+                        action: { Permissions.requestAccessibility() }
+                    )
+                    
+                    PermissionCard(
+                        title: "Screen & Window Recording",
+                        description: "Required to grab high-fidelity window preview thumbnails.",
+                        isGranted: state.isScreenRecordingGranted,
+                        action: { Permissions.requestScreenRecording() }
+                    )
+                }
+                .padding(14)
+                .background(Color.white.opacity(0.04))
+                .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
                 )
                 
-                Spacer()
+                // Keyboard Tester Cap View
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Event Tap Tester")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                    
+                    Text("Hold options key modifiers to check signal path response.")
+                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .foregroundColor(.white.opacity(0.55))
+                    
+                    HStack(spacing: 24) {
+                        Spacer()
+                        KeyCapView(
+                            label: "Option ⌥",
+                            isPressed: state.isOptionKeyPressed,
+                            gradientColors: [Color.blue, Color.cyan]
+                        )
+                        
+                        KeyCapView(
+                            label: "Tab ⇥",
+                            isPressed: state.isTabKeyPressed,
+                            gradientColors: [Color.purple, Color.pink]
+                        )
+                        Spacer()
+                    }
+                    .padding(.vertical, 8)
+                }
+                .padding(14)
+                .background(Color.white.opacity(0.04))
+                .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                )
             }
-            .padding(.bottom, 20)
-            
-            Spacer()
+            .padding(20)
         }
-        .padding(24)
+        .onAppear {
+            state.startStatsMonitoring()
+        }
+        .onDisappear {
+            state.stopStatsMonitoring()
+        }
+    }
+}
+
+struct SystemResourceMeter: View {
+    let title: String
+    let value: Double
+    let maxVal: Double
+    let label: String
+    let color: Color
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(title)
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                Spacer()
+                Text(label)
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(color)
+            }
+            
+            // Progress Bar Track
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.white.opacity(0.06))
+                        .frame(height: 8)
+                    
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(
+                            LinearGradient(
+                                colors: [color, color.opacity(0.6)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: geo.size.width * CGFloat(min(value / maxVal, 1.0)), height: 8)
+                        .shadow(color: color.opacity(0.4), radius: 4)
+                }
+            }
+            .frame(height: 8)
+        }
+        .padding(12)
+        .background(Color.white.opacity(0.04))
+        .cornerRadius(10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.white.opacity(0.06), lineWidth: 1)
+        )
     }
 }
 

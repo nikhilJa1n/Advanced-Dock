@@ -31,9 +31,13 @@ Built natively in Swift and SwiftUI, AdvancedDock runs as a highly efficient bac
 *   **Customizable Sizing**: Adjust the dock hover preview thumbnail size independently from 70% to 200% using a dedicated slider in the Control Panel settings.
 
 ### 3. Personalization & Control
+*   **Segmented Control Panel Dashboard**: Fully redesigned tabbed navigation separating General settings, Dock Previews, Exclusions, Diagnostics, and Help.
 *   **Customizable Hotkeys**: Record your own global activation shortcut (e.g. `⌥ + Space` or `⌘ + Tab`) via the settings shortcut recorder.
-*   **App Exclusions Blocklist**: Prevent specific applications from showing up in the switcher HUD cycle.
-*   **Modern ScreenCaptureKit Previews**: Uses Apple's modern, performant `ScreenCaptureKit` API for capturing window thumbnails, reducing cpu load and removing legacy warnings.
+*   **App Exclusions Blocklist & Search**: Filter and exclude running applications from showing up in the switcher HUD cycle.
+*   **Adjustable Dock Preview Delay**: Defer hover previews using a slider setting (0.1s to 1.5s) to prevent accidental overlays.
+*   **System Diagnostics & Telemetry**: Monitor real-time CPU and RAM utilization directly inside the Diagnostics tab with sleek linear meters.
+*   **Settings Factory Reset**: Restore the entire app to pristine native configurations with a single click.
+*   **Modern ScreenCaptureKit Previews**: Uses Apple's modern, performant `ScreenCaptureKit` API for capturing window thumbnails, reducing CPU load and removing legacy warnings.
 *   **Live Resource Widget**: Real-time glassmorphic CPU and RAM statistics monitor located in the top-right corner of the switcher HUD.
 ---
 
