@@ -38,28 +38,16 @@ struct SwitcherView: View {
     let currentIndex: Int
     let scale: Double
     let enableHoverSwitch: Bool
-    let gridRows: Int
-    let gridCols: Int
     let refreshToken: UUID
     let onHoverIndex: (Int) -> Void
     let onClickIndex: (Int) -> Void
     
-    var effectiveGridRows: Int {
-        if appState.switcherLayoutMode == "Minimalist" {
-            return 1
-        }
-        return gridRows
-    }
-    
-    var effectiveGridCols: Int {
-        if appState.switcherLayoutMode == "Minimalist" {
-            return min(windows.count, 5) > 0 ? min(windows.count, 5) : 5
-        }
-        return gridCols
+    var gridCols: Int {
+        return min(windows.count, 5) > 0 ? min(windows.count, 5) : 5
     }
     
     var pageSize: Int {
-        return effectiveGridRows * effectiveGridCols
+        return gridCols
     }
     
     var currentPage: Int {
@@ -67,176 +55,17 @@ struct SwitcherView: View {
         return currentIndex / pageSize
     }
     
-    var uniqueApps: [String] {
-        var seen = Set<String>()
-        var list = [String]()
-        for w in windows {
-            if !seen.contains(w.ownerName) {
-                seen.insert(w.ownerName)
-                list.append(w.ownerName)
-            }
-        }
-        return list
-    }
-    
     var body: some View {
         let cardWidth = 170.0 * scale
         let spacing = 20.0 * scale
-        let totalCardsWidth = cardWidth * Double(effectiveGridCols)
-        let totalSpacingWidth = spacing * Double(effectiveGridCols - 1)
+        let totalCardsWidth = cardWidth * Double(gridCols)
+        let totalSpacingWidth = spacing * Double(gridCols - 1)
         let contentWidth = totalCardsWidth + totalSpacingWidth
         
         let cardTotalHeight = 132.0 * scale // 106 height + 10 spacing + 16 text
-        let gridHeight = (cardTotalHeight * Double(effectiveGridRows)) + (spacing * Double(effectiveGridRows - 1))
+        let gridHeight = cardTotalHeight
         
-        HStack(spacing: 0) {
-            // Task 5: App Sidebar Grouping
-            if appState.switcherLayoutMode == "Standard" {
-                VStack(spacing: 14) {
-                    Button(action: { appState.selectedAppFilter = nil }) {
-                        VStack(spacing: 4) {
-                            Image(systemName: "square.grid.2x2.fill")
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundColor(appState.selectedAppFilter == nil ? .blue : .white.opacity(0.6))
-                                .frame(width: 44, height: 44)
-                                .background(
-                                    Group {
-                                        if appState.selectedAppFilter == nil {
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .fill(Color.blue.opacity(0.15))
-                                        }
-                                    }
-                                )
-                                .overlay(
-                                    Group {
-                                        if appState.selectedAppFilter == nil {
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .stroke(Color.blue.opacity(0.6), lineWidth: 1.5)
-                                        }
-                                    }
-                                )
-                            Text("All")
-                                .font(.system(size: 9, weight: .bold, design: .rounded))
-                                .foregroundColor(appState.selectedAppFilter == nil ? .white : .white.opacity(0.5))
-                        }
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    
-                    Divider()
-                        .background(Color.white.opacity(0.1))
-                        .padding(.horizontal, 10)
-                    
-                    ScrollView(.vertical, showsIndicators: false) {
-                        VStack(spacing: 12) {
-                            ForEach(uniqueApps, id: \.self) { app in
-                                let isSelected = appState.selectedAppFilter == app
-                                let icon = windows.first(where: { $0.ownerName == app })?.appIcon
-                                
-                                Button(action: {
-                                    if isSelected {
-                                        appState.selectedAppFilter = nil
-                                    } else {
-                                        appState.selectedAppFilter = app
-                                    }
-                                }) {
-                                    VStack(spacing: 4) {
-                                        ZStack {
-                                            if let nsIcon = icon {
-                                                Image(nsImage: nsIcon)
-                                                    .resizable()
-                                                    .aspectRatio(contentMode: .fit)
-                                                    .frame(width: 32, height: 32)
-                                            } else {
-                                                Image(systemName: "app")
-                                                    .font(.system(size: 20))
-                                                    .foregroundColor(.white.opacity(0.6))
-                                            }
-                                        }
-                                        .frame(width: 44, height: 44)
-                                        .background(
-                                            Group {
-                                                if isSelected {
-                                                    RoundedRectangle(cornerRadius: 12)
-                                                        .fill(Color.blue.opacity(0.15))
-                                                }
-                                            }
-                                        )
-                                        .overlay(
-                                            Group {
-                                                if isSelected {
-                                                    RoundedRectangle(cornerRadius: 12)
-                                                        .stroke(Color.blue.opacity(0.6), lineWidth: 1.5)
-                                                }
-                                            }
-                                        )
-                                        
-                                        Text(app)
-                                            .font(.system(size: 9, weight: .bold, design: .rounded))
-                                            .foregroundColor(isSelected ? .white : .white.opacity(0.5))
-                                            .lineLimit(1)
-                                            .frame(width: 64)
-                                    }
-                                }
-                                .buttonStyle(PlainButtonStyle())
-                            }
-                        }
-                        .padding(.vertical, 4)
-                    }
-                }
-                .frame(width: 80)
-                .padding(.vertical, 16)
-                .background(Color.black.opacity(0.15))
-                .overlay(
-                    HStack {
-                        Spacer()
-                        Rectangle()
-                            .fill(Color.white.opacity(0.1))
-                            .frame(width: 1)
-                    }
-                )
-            }
-            
-            // Switcher Grid Panel
-            VStack(spacing: 16) {
-                // Task 4: Fuzzy Search Bar (Dynamic in Minimalist Mode)
-                if appState.switcherLayoutMode == "Standard" || appState.isSearchActive || !appState.searchQuery.isEmpty {
-                    HStack(spacing: 8) {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundColor(.white.opacity(0.4))
-                            .font(.system(size: 14, weight: .bold))
-                        
-                        TextField("Search window titles or apps...", text: $appState.searchQuery, onEditingChanged: { isEditing in
-                            appState.isSearchActive = isEditing
-                        }, onCommit: {
-                            NotificationCenter.default.post(
-                                name: Notification.Name("commitSwitcherSelection"),
-                                object: nil
-                            )
-                        })
-                            .textFieldStyle(PlainTextFieldStyle())
-                            .font(.system(size: 13, weight: .medium, design: .rounded))
-                            .foregroundColor(.white)
-                        
-                        if !appState.searchQuery.isEmpty {
-                            Button(action: { appState.searchQuery = "" }) {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundColor(.white.opacity(0.4))
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(Color.white.opacity(0.06))
-                    .cornerRadius(10)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                    )
-                    .padding(.horizontal, 24)
-                    .padding(.top, 16)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                }
+        VStack(spacing: 16) {
             // Selected Window Title Banner
             if currentIndex >= 0 && currentIndex < windows.count {
                 let currentWindow = windows[currentIndex]
@@ -269,41 +98,28 @@ struct SwitcherView: View {
             
             // Paginated Container Box with stable dimensions
             VStack(spacing: 12) {
-                VStack(spacing: CGFloat(spacing)) {
+                HStack(spacing: CGFloat(spacing)) {
+                    Spacer()
                     let start = currentPage * pageSize
                     let end = min(start + pageSize, windows.count)
                     
-                    ForEach(0..<effectiveGridRows, id: \.self) { row in
-                        HStack(spacing: CGFloat(spacing)) {
-                            Spacer()
-                            ForEach(0..<effectiveGridCols, id: \.self) { col in
-                                let cardIndex = start + (row * effectiveGridCols) + col
-                                if cardIndex < end {
-                                    let window = windows[cardIndex]
-                                    WindowCard(
-                                        window: window,
-                                        isSelected: cardIndex == currentIndex,
-                                        scale: scale,
-                                        enableHoverSwitch: enableHoverSwitch,
-                                        refreshToken: refreshToken,
-                                        onHover: { onHoverIndex(cardIndex) },
-                                        onClick: { onClickIndex(cardIndex) },
-                                        appState: appState
-                                    )
-                                    .id(window.id)
-                                } else {
-                                    // Empty slot filler to keep standard card bounds (only in standard grid mode)
-                                    if appState.switcherLayoutMode == "Standard" {
-                                        Color.clear
-                                            .frame(width: CGFloat(cardWidth), height: CGFloat(cardTotalHeight))
-                                    }
-                                }
-                            }
-                            Spacer()
-                        }
+                    ForEach(start..<end, id: \.self) { cardIndex in
+                        let window = windows[cardIndex]
+                        WindowCard(
+                            window: window,
+                            isSelected: cardIndex == currentIndex,
+                            scale: scale,
+                            enableHoverSwitch: enableHoverSwitch,
+                            refreshToken: refreshToken,
+                            onHover: { onHoverIndex(cardIndex) },
+                            onClick: { onClickIndex(cardIndex) },
+                            appState: appState
+                        )
+                        .id(window.id)
                     }
+                    Spacer()
                 }
-                .frame(width: CGFloat(contentWidth))
+                .frame(height: CGFloat(gridHeight + 15), alignment: .center)
                 
                 // Page Indicator Dots
                 let totalPages = Int(ceil(Double(windows.count) / Double(pageSize)))
@@ -323,7 +139,6 @@ struct SwitcherView: View {
                         .frame(height: 10)
                 }
             }
-            .frame(height: CGFloat(gridHeight + 15), alignment: .center)
             
             // Shortcut Help Footer
             Text("Release ⌥ (Option) to switch  •  Press ⎋ (Esc) to cancel")
@@ -331,10 +146,9 @@ struct SwitcherView: View {
                 .foregroundColor(.white.opacity(0.4))
                 .padding(.bottom, 4)
         }
-        }
         .padding(.vertical, 20)
         // Solid fixed width and height to prevent sizing jumps and keep window bounded on screen
-        .frame(width: CGFloat(contentWidth + 60 + 80), height: CGFloat(gridHeight + 217))
+        .frame(width: CGFloat(contentWidth + 60), height: CGFloat(gridHeight + 160))
         .background(
             VisualEffectView(material: .hudWindow, blendingMode: .behindWindow, cornerRadius: 24)
                 .overlay(

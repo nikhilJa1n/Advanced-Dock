@@ -29,7 +29,7 @@ class SwitcherWindow: NSPanel {
         self.ignoresMouseEvents = false // Allow mouse interactions if the user wants to click a thumbnail
     }
     
-    func show(appState: AppState, windows: [WindowInfo], currentIndex: Int, scale: Double, enableHoverSwitch: Bool, gridRows: Int, gridCols: Int, onHover: @escaping (Int) -> Void, onClick: @escaping (Int) -> Void) {
+    func show(appState: AppState, windows: [WindowInfo], currentIndex: Int, scale: Double, enableHoverSwitch: Bool, onHover: @escaping (Int) -> Void, onClick: @escaping (Int) -> Void) {
         // New token forces all WindowCard views to reload their thumbnails
         refreshToken = UUID()
         let rootView = SwitcherView(
@@ -38,8 +38,6 @@ class SwitcherWindow: NSPanel {
             currentIndex: currentIndex,
             scale: scale,
             enableHoverSwitch: enableHoverSwitch,
-            gridRows: gridRows,
-            gridCols: gridCols,
             refreshToken: refreshToken,
             onHoverIndex: onHover,
             onClickIndex: onClick
@@ -65,15 +63,13 @@ class SwitcherWindow: NSPanel {
         self.orderFront(nil)
     }
     
-    func update(appState: AppState, windows: [WindowInfo], currentIndex: Int, scale: Double, enableHoverSwitch: Bool, gridRows: Int, gridCols: Int, onHover: @escaping (Int) -> Void, onClick: @escaping (Int) -> Void) {
+    func update(appState: AppState, windows: [WindowInfo], currentIndex: Int, scale: Double, enableHoverSwitch: Bool, onHover: @escaping (Int) -> Void, onClick: @escaping (Int) -> Void) {
         let rootView = SwitcherView(
             appState: appState,
             windows: windows,
             currentIndex: currentIndex,
             scale: scale,
             enableHoverSwitch: enableHoverSwitch,
-            gridRows: gridRows,
-            gridCols: gridCols,
             refreshToken: refreshToken,
             onHoverIndex: onHover,
             onClickIndex: onClick

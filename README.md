@@ -18,14 +18,10 @@ Built natively in Swift and SwiftUI, AdvancedDock runs as a highly efficient bac
 
 ### 1. Smart App Switcher (`⌥ + Tab`)
 *   **Quick Switch**: Hold `⌥ (Option)` and tap `Tab` to cycle between windows. Release `⌥` to switch immediately.
-*   **Search Pinning**: Click the search bar or type search queries to lock the switcher open, allowing you to search and select windows without holding keys.
-*   **Fuzzy Search**: Instantly filter open windows by title or application name.
-*   **Sidebar Grouping**: Clean sidebar categorizing open windows by app for organized navigation.
 *   **Window Cards & Thumbnails**: Real-time window preview cards featuring app-badge icons. Drag a card upwards to close the window instantly.
 *   **Aero Action Panel**: Quick window controls directly from the card (Close, Minimize, Maximize, Exit Full-Screen, Force Quit).
 *   **Window Snapping**: Snap windows to the left half, right half, or maximize them instantly with one click.
-*   **Customizable Grid**: Configure the switcher's grid layout (rows and columns) to fit your screen size and workspace preferences.
-*   **Customizable Layouts**: Toggle between **Standard** layout (sidebar, search bar, full grid) and **Minimalist** layout (clean horizontal row, hidden sidebar, and a search bar that appears dynamically only when typing starts).
+*   **Minimalist Row Layout**: Cycles through open windows using a clean, single horizontal row of card previews centered on your screen, focusing purely on speed and simplicity.
 
 ### 2. Interactive Dock Previews
 *   Hover over any active Dock icon to see real-time floating thumbnails of that application's open windows.

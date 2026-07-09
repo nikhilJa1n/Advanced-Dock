@@ -32,14 +32,6 @@ class AppState: ObservableObject {
         didSet { UserDefaults.standard.set(windowSortOrder, forKey: "windowSortOrder") }
     }
     
-    @Published var gridRows: Int {
-        didSet { UserDefaults.standard.set(gridRows, forKey: "gridRows") }
-    }
-    
-    @Published var gridCols: Int {
-        didSet { UserDefaults.standard.set(gridCols, forKey: "gridCols") }
-    }
-    
     @Published var enableDockHoverPreviews: Bool {
         didSet { UserDefaults.standard.set(enableDockHoverPreviews, forKey: "enableDockHoverPreviews") }
     }
@@ -52,14 +44,6 @@ class AppState: ObservableObject {
         didSet { UserDefaults.standard.set(dockHoverThumbnailScale, forKey: "dockHoverThumbnailScale") }
     }
     
-    @Published var switcherLayoutMode: String {
-        didSet { UserDefaults.standard.set(switcherLayoutMode, forKey: "switcherLayoutMode") }
-    }
-    
-    @Published var selectedAppFilter: String? = nil
-    @Published var searchQuery: String = ""
-    @Published var isSearchActive: Bool = false
-    
     private var timer: AnyCancellable?
     
     init() {
@@ -71,17 +55,11 @@ class AppState: ObservableObject {
         self.showAllSpaces = UserDefaults.standard.object(forKey: "showAllSpaces") as? Bool ?? false
         self.windowSortOrder = UserDefaults.standard.string(forKey: "windowSortOrder") ?? "Recently Used"
         
-        let rowsVal = UserDefaults.standard.integer(forKey: "gridRows")
-        self.gridRows = rowsVal == 0 ? 1 : rowsVal
-        let colsVal = UserDefaults.standard.integer(forKey: "gridCols")
-        self.gridCols = colsVal == 0 ? 5 : colsVal
         self.enableDockHoverPreviews = UserDefaults.standard.object(forKey: "enableDockHoverPreviews") as? Bool ?? true
         self.activeTheme = UserDefaults.standard.string(forKey: "activeTheme") ?? "Glassmorphism"
         
         let dockScaleVal = UserDefaults.standard.double(forKey: "dockHoverThumbnailScale")
         self.dockHoverThumbnailScale = dockScaleVal == 0 ? 1.0 : dockScaleVal
-        
-        self.switcherLayoutMode = UserDefaults.standard.string(forKey: "switcherLayoutMode") ?? "Standard"
         
         checkPermissions()
         startPermissionPolling()
@@ -449,67 +427,6 @@ struct PermissionsTab: View {
                                     .font(.system(size: 11, weight: .medium))
                                 Text("Ultra Minimal").tag("Ultra Minimal")
                                     .font(.system(size: 11, weight: .medium))
-                            }
-                            .pickerStyle(MenuPickerStyle())
-                            .frame(width: 140)
-                        }
-                        
-                        Divider()
-                        
-                        // Switcher Layout Mode Picker
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Switcher Layout Mode")
-                                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                                    .foregroundColor(.white)
-                                Text("Toggle between a full standard grid or a minimalist simple row.")
-                                    .font(.system(size: 10, weight: .regular, design: .rounded))
-                                    .foregroundColor(.white.opacity(0.55))
-                            }
-                            Spacer()
-                            Picker("", selection: $state.switcherLayoutMode) {
-                                Text("Standard").tag("Standard")
-                                    .font(.system(size: 11, weight: .medium))
-                                Text("Minimalist").tag("Minimalist")
-                                    .font(.system(size: 11, weight: .medium))
-                            }
-                            .pickerStyle(MenuPickerStyle())
-                            .frame(width: 140)
-                        }
-                        
-                        Divider()
-                        
-                        // Grid Dimensions Picker
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Grid Layout (Rows x Columns)")
-                                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                                    .foregroundColor(.white)
-                                Text("Configure how many rows and columns show per page.")
-                                    .font(.system(size: 10, weight: .regular, design: .rounded))
-                                    .foregroundColor(.white.opacity(0.55))
-                            }
-                            Spacer()
-                            HStack(spacing: 8) {
-                                Picker("Rows", selection: $state.gridRows) {
-                                    ForEach(1...3, id: \.self) { r in
-                                        Text("\(r) Row\(r > 1 ? "s" : "")").tag(r)
-                                    }
-                                }
-                                .pickerStyle(MenuPickerStyle())
-                                .frame(width: 85)
-                                
-                                Text("x")
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundColor(.white.opacity(0.4))
-                                
-                                Picker("Cols", selection: $state.gridCols) {
-                                    ForEach(3...6, id: \.self) { c in
-                                        Text("\(c) Col\(c > 1 ? "s" : "")").tag(c)
-                                    }
-                                }
-                                .pickerStyle(MenuPickerStyle())
-                                .frame(width: 85)
                             }
                         }
                     }
