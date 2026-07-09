@@ -32,6 +32,7 @@ Built natively in Swift and SwiftUI, AdvancedDock runs as a highly efficient bac
 
 ### 3. Personalization & Control
 *   **Segmented Control Panel Dashboard**: Fully redesigned tabbed navigation separating General settings, Dock Previews, Exclusions, Diagnostics, and Help.
+*   **App Snapping Presets (Grid Manager)**: Instantly snap all open windows of any running application into a clean layout: *2x2 Grid*, *3-Column Split*, or *70/30 Split* via the General Preferences dashboard.
 *   **Customizable Hotkeys**: Record your own global activation shortcut (e.g. `⌥ + Space` or `⌘ + Tab`) via the settings shortcut recorder.
 *   **App Exclusions Blocklist & Search**: Filter and exclude running applications from showing up in the switcher HUD cycle.
 *   **Adjustable Dock Preview Delay**: Defer hover previews using a slider setting (0.1s to 1.5s) to prevent accidental overlays.

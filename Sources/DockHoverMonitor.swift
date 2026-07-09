@@ -12,6 +12,7 @@ class DockHoverMonitor {
     var previewWindowFrameProvider: (() -> CGRect?)?
     private var timer: Timer?
     private var currentHoveredApp: String?
+    private var pendingHoveredApp: String?
     private var activeDockPID: pid_t?
     private var hoverDelayWorkItem: DispatchWorkItem?
     
@@ -35,6 +36,9 @@ class DockHoverMonitor {
         timer?.invalidate()
         timer = nil
         currentHoveredApp = nil
+        pendingHoveredApp = nil
+        hoverDelayWorkItem?.cancel()
+        hoverDelayWorkItem = nil
     }
     
     private func findDockPID() {
@@ -119,25 +123,34 @@ class DockHoverMonitor {
         
         if let item = hoveredItem {
             if currentHoveredApp != item.title {
-                hoverDelayWorkItem?.cancel()
-                
-                let appName = item.title
-                let cocoaFrame = CGRect(
-                    x: item.frame.origin.x,
-                    y: screenHeight - item.frame.origin.y - item.frame.size.height,
-                    width: item.frame.size.width,
-                    height: item.frame.size.height
-                )
-                
-                let delay = appState.dockHoverDelay
-                let workItem = DispatchWorkItem { [weak self] in
-                    guard let self = self else { return }
-                    self.logMessage("[DockHoverMonitor] Hover delay fired for '\(appName)'")
-                    self.currentHoveredApp = appName
-                    self.delegate?.dockHoverMonitorDidHover(appName: appName, itemFrame: cocoaFrame)
+                if pendingHoveredApp != item.title {
+                    hoverDelayWorkItem?.cancel()
+                    pendingHoveredApp = item.title
+                    
+                    let appName = item.title
+                    let cocoaFrame = CGRect(
+                        x: item.frame.origin.x,
+                        y: screenHeight - item.frame.origin.y - item.frame.size.height,
+                        width: item.frame.size.width,
+                        height: item.frame.size.height
+                    )
+                    
+                    let delay = appState.dockHoverDelay
+                    let workItem = DispatchWorkItem { [weak self] in
+                        guard let self = self else { return }
+                        self.logMessage("[DockHoverMonitor] Hover delay fired for '\(appName)'")
+                        self.currentHoveredApp = appName
+                        self.pendingHoveredApp = nil
+                        self.delegate?.dockHoverMonitorDidHover(appName: appName, itemFrame: cocoaFrame)
+                    }
+                    self.hoverDelayWorkItem = workItem
+                    DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
                 }
-                self.hoverDelayWorkItem = workItem
-                DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
+            } else {
+                // If it is already the current hovered app, cancel any pending switch timer
+                hoverDelayWorkItem?.cancel()
+                hoverDelayWorkItem = nil
+                pendingHoveredApp = nil
             }
         } else {
             // Check if mouse is currently inside the preview window
@@ -147,6 +160,7 @@ class DockHoverMonitor {
             
             hoverDelayWorkItem?.cancel()
             hoverDelayWorkItem = nil
+            pendingHoveredApp = nil
             
             if currentHoveredApp != nil {
                 logMessage("[DockHoverMonitor] Hover dismissed (currentHoveredApp was '\(currentHoveredApp!)')")

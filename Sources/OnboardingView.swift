@@ -395,6 +395,7 @@ struct SidebarButton: View {
 // Permissions View
 struct GeneralTab: View {
     @ObservedObject var state: AppState
+    @State private var selectedGridApp = ""
     
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
@@ -476,6 +477,97 @@ struct GeneralTab: View {
                                 .font(.system(size: 11, weight: .medium))
                         }
                         .pickerStyle(MenuPickerStyle())
+                    }
+                    
+                    Divider()
+                    
+                    // App Snapping Presets (Grid Manager)
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("App Snapping Presets (Grid Manager)")
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                        
+                        Text("Select a running application to instantly snap all of its open windows into a structured layout preset on your screen.")
+                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .foregroundColor(.white.opacity(0.55))
+                        
+                        HStack(spacing: 12) {
+                            Picker("", selection: $selectedGridApp) {
+                                Text("Select Application...").tag("")
+                                    .font(.system(size: 11))
+                                ForEach(state.getRunningApps()) { app in
+                                    Text(app.name).tag(app.name)
+                                        .font(.system(size: 11))
+                                }
+                            }
+                            .pickerStyle(DefaultPickerStyle())
+                            .frame(width: 200)
+                            
+                            if !selectedGridApp.isEmpty {
+                                HStack(spacing: 8) {
+                                    Button(action: {
+                                        WindowList.applyPresetLayout(preset: "2x2 Grid", forAppName: selectedGridApp)
+                                    }) {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "square.grid.2x2.fill")
+                                            Text("2x2 Grid")
+                                        }
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 5)
+                                        .background(Color.blue.opacity(0.2))
+                                        .cornerRadius(6)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 6)
+                                                .stroke(Color.blue.opacity(0.4), lineWidth: 1)
+                                        )
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                    
+                                    Button(action: {
+                                        WindowList.applyPresetLayout(preset: "3-Column Split", forAppName: selectedGridApp)
+                                    }) {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "square.split.3x1.fill")
+                                            Text("3-Col Split")
+                                        }
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 5)
+                                        .background(Color.blue.opacity(0.2))
+                                        .cornerRadius(6)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 6)
+                                                .stroke(Color.blue.opacity(0.4), lineWidth: 1)
+                                        )
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                    
+                                    Button(action: {
+                                        WindowList.applyPresetLayout(preset: "70/30 Split", forAppName: selectedGridApp)
+                                    }) {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "square.split.2x1.fill")
+                                            Text("70/30 Split")
+                                        }
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 5)
+                                        .background(Color.blue.opacity(0.2))
+                                        .cornerRadius(6)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 6)
+                                                .stroke(Color.blue.opacity(0.4), lineWidth: 1)
+                                        )
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                }
+                            }
+                        }
+                        .padding(.top, 4)
                     }
                     
                     Divider()
