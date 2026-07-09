@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg?style=flat-square)](LICENSE)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg?style=flat-square)](.github/workflows/build.yml)
 
-**AdvancedDock** is a premium, open-source macOS utility that redefines window switching and dock interactions. It replaces the default macOS app switcher and dock behaviors with a modern, glassmorphic HUD panel featuring fuzzy search, app-based sidebar grouping, and interactive dock hover window previews.
+**AdvancedDock** is a premium, open-source macOS utility that redefines window switching and dock interactions. It replaces the default macOS app switcher and dock behaviors with a modern, glassmorphic HUD panel featuring a clean flat card list layout, live CPU/RAM host telemetry tracking, and interactive dock hover window previews.
 
 Built natively in Swift and SwiftUI, AdvancedDock runs as a highly efficient background agent that overlays seamlessly across all workspaces and full-screen spaces.
 
@@ -50,21 +50,15 @@ The interface is built with native macOS visual effects (frosted glass) and prem
 
 ![AdvancedDock Switcher HUD](screenshots/switcher_hud.png)
 
-### 2. Control Panel & Preferences
+### 2. Control Panel & Preferences Dashboard
 
-AdvancedDock includes a comprehensive Control Panel to configure hotkeys, themes, and monitor accessibility permissions:
+AdvancedDock includes a comprehensive 5-tab Control Panel dashboard to configure settings, review telemetry, and monitor system permissions:
 
-| Permissions Setup | General Preferences |
-| :---: | :---: |
-| ![Permissions](screenshots/control_panel_permissions.png) | ![General Preferences](screenshots/control_panel_preferences_general.png) |
-
-| Shortcut Tester | Theme & Grid Options |
-| :---: | :---: |
-| ![Shortcut Tester](screenshots/control_panel_shortcut_tester.png) | ![Theme & Grid Options](screenshots/control_panel_preferences_themes.png) |
-
-| How to Use Guide |
-| :---: |
-| ![How to Use](screenshots/control_panel_how_to_use.png) |
+*   **General Preferences**: Customize arrow navigation, hover switching, window sorting, card scaling, and trigger grid snapping presets.
+*   **Dock Previews**: Adjust sizing scale and activation delays (0.1s to 1.5s).
+*   **Hotkeys & Exclusions**: Record custom shortcuts and manage cycle exclusions with active search filtering.
+*   **System Diagnostics**: View real-time CPU/RAM meters, review accessibility/screen recording grants, and test key modifiers.
+*   **How to Use**: Reference helper guides and keyboard shortcut legends.
 
 ---
 
@@ -77,7 +71,6 @@ AdvancedDock includes a comprehensive Control Panel to configure hotkeys, themes
 | **Arrow Key Navigation** | `←` / `→` or `↑` / `↓` |
 | **Select Highlighted Window** | Release `⌥` (or press `Space` / `Enter` if pinned) |
 | **Cancel & Dismiss** | Press `⎋ (Esc)` |
-| **Pin Switcher Open** | Click the Search Bar or start typing |
 | **Close Window (Gesture)** | Drag the window card upwards and release |
 | **Trigger Snapping** | Hover over card, click a layout button in the action panel |
 
