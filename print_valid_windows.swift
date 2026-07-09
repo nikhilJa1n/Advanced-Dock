@@ -55,9 +55,11 @@ func getWindows() -> [String] {
                     var minimizeButtonValue: AnyObject?
                     let hasMinimize = AXUIElementCopyAttributeValue(axWindow, kAXMinimizeButtonAttribute as CFString, &minimizeButtonValue) == .success && minimizeButtonValue != nil
                     
+                    /*
                     if !hasClose && !hasMinimize {
                         continue
                     }
+                    */
                     
                     if let id = getWindowID(from: axWindow) {
                         validAXWindowIDs.insert(id)

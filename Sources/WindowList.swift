@@ -9,6 +9,7 @@ struct WindowInfo: Identifiable, Hashable {
     let title: String
     let bounds: CGRect
     let appIcon: NSImage?
+    let isAXValid: Bool
     
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
@@ -64,7 +65,6 @@ class WindowList {
     static func getWindows(showAllSpacesOverride: Bool? = nil, showMinimizedOverride: Bool? = nil) -> [WindowInfo] {
         // Gather onscreen Z-order rank from active space to sort raw lists in MRU order
         var onscreenZOrder: [CGWindowID: Int] = [:]
-        var seenBoundsForPID: [pid_t: Set<String>] = [:]
         let onscreenOptions = CGWindowListOption(arrayLiteral: .optionOnScreenOnly, .excludeDesktopElements)
         if let onscreenList = CGWindowListCopyWindowInfo(onscreenOptions, kCGNullWindowID) as? [[String: Any]] {
             for (index, info) in onscreenList.enumerated() {
@@ -131,16 +131,7 @@ class WindowList {
                         }
                     }
                     
-                    // Check close and minimize buttons: standard windows must have close or minimize controls
-                    var closeButtonValue: AnyObject?
-                    let hasClose = AXUIElementCopyAttributeValue(axWindow, kAXCloseButtonAttribute as CFString, &closeButtonValue) == .success && closeButtonValue != nil
-                    
-                    var minimizeButtonValue: AnyObject?
-                    let hasMinimize = AXUIElementCopyAttributeValue(axWindow, kAXMinimizeButtonAttribute as CFString, &minimizeButtonValue) == .success && minimizeButtonValue != nil
-                    
-                    if !hasClose && !hasMinimize {
-                        continue
-                    }
+                    // Let all AXWindows pass role validation without requiring standard close/minimize controls (fixes custom/Chromium decorations)
                     
                     if let id = getWindowID(from: axWindow) {
                         validAXWindowIDs.insert(id)
@@ -252,16 +243,6 @@ class WindowList {
                 continue
             }
             
-            // Deduplicate tabs/overlapping windows of the same application
-            let boundsKey = "\(Int(bounds.origin.x)),\(Int(bounds.origin.y)),\(Int(bounds.width)),\(Int(bounds.height))"
-            if seenBoundsForPID[pid] == nil {
-                seenBoundsForPID[pid] = []
-            }
-            if seenBoundsForPID[pid]!.contains(boundsKey) {
-                continue
-            }
-            seenBoundsForPID[pid]!.insert(boundsKey)
-            
             // Space / minimized filter checks
             if !isOnscreen {
                 let minimized = isWindowMinimized(pid: pid, windowID: windowID)
@@ -293,21 +274,34 @@ class WindowList {
                 ownerName: ownerName,
                 title: title.isEmpty ? ownerName : title,
                 bounds: bounds,
-                appIcon: appIcon
+                appIcon: appIcon,
+                isAXValid: isAXValid
             )
             windows.append(window)
         }
         
-        // FILTER CO-LOCATED DUPLICATES: Remove windows that share the same PID, title, and exact screen bounds
-        var seenKeys = Set<String>()
+        // DEDUPLICATE TABS & HELPER WINDOWS: Keep all AX-valid windows. For non-AX-valid windows (tabs/helpers), only keep them if they don't overlap with already kept windows of the same app.
         var uniqueWindows: [WindowInfo] = []
+        var seenBoundsForPID = [pid_t: Set<String>]()
+        
+        // First pass: always keep AX-valid windows
         for window in windows {
-            let key = "\(window.pid)-\(window.title)-\(Int(window.bounds.origin.x))-\(Int(window.bounds.origin.y))-\(Int(window.bounds.size.width))-\(Int(window.bounds.size.height))"
-            if seenKeys.contains(key) {
-                continue
+            if window.isAXValid {
+                let boundsKey = "\(Int(window.bounds.origin.x))-\(Int(window.bounds.origin.y))-\(Int(window.bounds.size.width))-\(Int(window.bounds.size.height))"
+                seenBoundsForPID[window.pid, default: []].insert(boundsKey)
+                uniqueWindows.append(window)
             }
-            seenKeys.insert(key)
-            uniqueWindows.append(window)
+        }
+        
+        // Second pass: for non-AX-valid windows, only keep them if their bounds have not been seen
+        for window in windows {
+            if !window.isAXValid {
+                let boundsKey = "\(Int(window.bounds.origin.x))-\(Int(window.bounds.origin.y))-\(Int(window.bounds.size.width))-\(Int(window.bounds.size.height))"
+                if !seenBoundsForPID[window.pid, default: []].contains(boundsKey) {
+                    seenBoundsForPID[window.pid, default: []].insert(boundsKey)
+                    uniqueWindows.append(window)
+                }
+            }
         }
         windows = uniqueWindows
         
@@ -347,7 +341,7 @@ class WindowList {
         var capturedImage: CGImage?
         let semaphore = DispatchSemaphore(value: 0)
         
-        SCShareableContent.getExcludingDesktopWindows(false, onScreenWindowsOnly: true) { content, error in
+        SCShareableContent.getExcludingDesktopWindows(false, onScreenWindowsOnly: false) { content, error in
             guard let content = content, error == nil else {
                 semaphore.signal()
                 return
@@ -370,7 +364,7 @@ class WindowList {
             }
         }
         
-        _ = semaphore.wait(timeout: .now() + 0.3)
+        _ = semaphore.wait(timeout: .now() + 0.8)
         
         if capturedImage == nil {
             capturedImage = CGWindowListCreateImage(
