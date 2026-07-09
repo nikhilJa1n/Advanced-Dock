@@ -27,13 +27,6 @@ Built natively in Swift and SwiftUI, AdvancedDock runs as a highly efficient bac
 *   Hover over any active Dock icon to see real-time floating thumbnails of that application's open windows.
 *   Select, close, or snap windows directly from the dock hover preview panel.
 *   **Customizable Sizing**: Adjust the dock hover preview thumbnail size independently from 70% to 200% using a dedicated slider in the Control Panel settings.
-
-### 3. Dynamic Themes
-*   **Glassmorphism**: Elegant frosted translucent borders (Default).
-*   **Ultra Minimal**: Clean, borderless, content-first flat theme.
-*   **Neon Blue**: Vibrant, cyberpunk-style glowing active borders and shadows.
-*   **Rainbow Sweep**: Beautiful animated spectrum gradients cycling around selected window cards.
-
 ---
 
 ## 📸 Preview & Aesthetics

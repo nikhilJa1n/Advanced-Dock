@@ -69,19 +69,26 @@ struct SwitcherView: View {
             // Selected Window Title Banner
             if currentIndex >= 0 && currentIndex < windows.count {
                 let currentWindow = windows[currentIndex]
-                VStack(spacing: 4) {
+                VStack(spacing: 6) {
+                    HStack(spacing: 8) {
+                        if let icon = currentWindow.appIcon {
+                            Image(nsImage: icon)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 18, height: 18)
+                        }
+                        Text(currentWindow.ownerName)
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .foregroundColor(.white.opacity(0.7))
+                    }
+                    
                     Text(currentWindow.title)
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
                         .foregroundColor(.white)
                         .lineLimit(1)
                         .padding(.horizontal, 24)
-                    
-                    Text(currentWindow.ownerName)
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundColor(.white.opacity(0.6))
-                        .lineLimit(1)
                 }
-                .frame(height: 44)
+                .frame(height: 48)
                 .transition(.opacity)
             } else {
                 VStack(spacing: 4) {
@@ -246,67 +253,25 @@ struct CardThumbnailView: View {
     @State private var isFadingOut = false
     @State private var rotationAngle = 0.0
     
-    var isRainbow: Bool { appState.activeTheme == "Rainbow Sweep" }
-    var isNeon: Bool { appState.activeTheme == "Neon Blue" }
-    var isMinimal: Bool { appState.activeTheme == "Ultra Minimal" }
-    
     var borderColor: Color {
-        if isSelected {
-            if isRainbow || isNeon {
-                return .clear
-            } else {
-                return .blue
-            }
-        } else {
-            if isMinimal {
-                return Color.gray.opacity(0.3)
-            } else {
-                return Color.white.opacity(0.12)
-            }
-        }
+        return isSelected ? .blue : Color.white.opacity(0.12)
     }
     
     var borderWidth: CGFloat {
-        return isSelected ? 5.0 : 1.0
+        return isSelected ? 3.0 : 1.0
     }
     
     var shadowColor: Color {
-        if isSelected {
-            if isNeon {
-                return Color.cyan.opacity(0.8)
-            } else if isRainbow {
-                return Color.purple.opacity(0.6)
-            } else {
-                return Color.blue.opacity(0.6)
-            }
-        } else {
-            return .clear
-        }
+        return isSelected ? Color.blue.opacity(0.4) : .clear
     }
     
     var shadowRadius: CGFloat {
-        if isSelected {
-            return isNeon ? 12 : 8
-        } else {
-            return 0
-        }
+        return isSelected ? 8 : 0
     }
     
     var body: some View {
         let cardWidth = 170.0 * scale
         let cardHeight = 106.0 * scale
-        
-        let rainbow = AngularGradient(
-            colors: [.red, .yellow, .green, .blue, .purple, .red],
-            center: .center,
-            angle: .degrees(rotationAngle)
-        )
-        
-        let neon = AngularGradient(
-            colors: [.cyan, .blue, .purple, .cyan],
-            center: .center,
-            angle: .degrees(rotationAngle)
-        )
         
         ZStack {
             if let thumb = thumbnail {
@@ -348,8 +313,9 @@ struct CardThumbnailView: View {
                             .shadow(radius: 2)
                         Spacer()
                     }
+                    .padding(CGFloat(8 * scale))
                 }
-                .padding(CGFloat(8 * scale))
+                .frame(width: CGFloat(cardWidth), height: CGFloat(cardHeight))
             }
             
             // Action Buttons capsule bar (Close, Minimize, Maximize, Force Quit) + Layout Snapping
@@ -376,19 +342,6 @@ struct CardThumbnailView: View {
         }
         .frame(width: CGFloat(cardWidth), height: CGFloat(cardHeight))
         .cornerRadius(12)
-        .overlay(
-            Group {
-                if isSelected {
-                    if isRainbow {
-                        RoundedRectangle(cornerRadius: 12)
-                            .strokeBorder(rainbow, lineWidth: 5.0)
-                    } else if isNeon {
-                        RoundedRectangle(cornerRadius: 12)
-                            .strokeBorder(neon, lineWidth: 5.0)
-                    }
-                }
-            }
-        )
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .stroke(borderColor, lineWidth: borderWidth)
@@ -430,13 +383,6 @@ struct CardThumbnailView: View {
         }
         .onTapGesture {
             onClick()
-        }
-        .onAppear {
-            if isRainbow || isNeon {
-                withAnimation(Animation.linear(duration: 4.0).repeatForever(autoreverses: false)) {
-                    rotationAngle = 360.0
-                }
-            }
         }
     }
     

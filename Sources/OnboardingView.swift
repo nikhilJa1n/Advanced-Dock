@@ -36,10 +36,6 @@ class AppState: ObservableObject {
         didSet { UserDefaults.standard.set(enableDockHoverPreviews, forKey: "enableDockHoverPreviews") }
     }
     
-    @Published var activeTheme: String {
-        didSet { UserDefaults.standard.set(activeTheme, forKey: "activeTheme") }
-    }
-    
     @Published var dockHoverThumbnailScale: Double {
         didSet { UserDefaults.standard.set(dockHoverThumbnailScale, forKey: "dockHoverThumbnailScale") }
     }
@@ -56,7 +52,6 @@ class AppState: ObservableObject {
         self.windowSortOrder = UserDefaults.standard.string(forKey: "windowSortOrder") ?? "Recently Used"
         
         self.enableDockHoverPreviews = UserDefaults.standard.object(forKey: "enableDockHoverPreviews") as? Bool ?? true
-        self.activeTheme = UserDefaults.standard.string(forKey: "activeTheme") ?? "Glassmorphism"
         
         let dockScaleVal = UserDefaults.standard.double(forKey: "dockHoverThumbnailScale")
         self.dockHoverThumbnailScale = dockScaleVal == 0 ? 1.0 : dockScaleVal
@@ -402,32 +397,6 @@ struct PermissionsTab: View {
                                     .font(.system(size: 11, weight: .medium))
                             }
                             .pickerStyle(MenuPickerStyle())
-                            .frame(width: 140)
-                        }
-                        
-                        Divider()
-                        
-                        // Theme Style Picker
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Switcher Active Theme")
-                                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                                    .foregroundColor(.white)
-                                Text("Select the design styling of the switcher cards.")
-                                    .font(.system(size: 10, weight: .regular, design: .rounded))
-                                    .foregroundColor(.white.opacity(0.55))
-                            }
-                            Spacer()
-                            Picker("", selection: $state.activeTheme) {
-                                Text("Glassmorphism").tag("Glassmorphism")
-                                    .font(.system(size: 11, weight: .medium))
-                                Text("Neon Blue").tag("Neon Blue")
-                                    .font(.system(size: 11, weight: .medium))
-                                Text("Rainbow Sweep").tag("Rainbow Sweep")
-                                    .font(.system(size: 11, weight: .medium))
-                                Text("Ultra Minimal").tag("Ultra Minimal")
-                                    .font(.system(size: 11, weight: .medium))
-                            }
                         }
                     }
                 }
