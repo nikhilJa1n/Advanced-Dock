@@ -360,11 +360,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotkeyManagerDelegate {
         
         let view = OnboardingView(state: appState)
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 660, height: 460),
-            styleMask: [.titled, .closable, .miniaturizable],
+            contentRect: NSRect(x: 0, y: 0, width: 780, height: 520),
+            styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.hasShadow = true
         window.title = "Advanced Switcher Control Panel"
         window.contentView = NSHostingView(rootView: view)
         window.center()
