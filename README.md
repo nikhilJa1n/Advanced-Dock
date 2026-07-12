@@ -116,17 +116,26 @@ This generates **`AdvancedDock.dmg`**. Drag-and-drop the app bundle inside it to
 
 ## 🚀 Publishing Releases
 
-AdvancedDock contains a fully automated, idempotent release script (`release.sh`) that manages commits, updates configuration versions, pushes code, and publishes release assets.
+AdvancedDock uses a modular, two-tier release workflow based on the GitHub CLI (`gh`):
 
-```bash
-# Set your token and run the script
-GITHUB_TOKEN=your_personal_access_token ./release.sh
-```
+1.  **Local Packaging (`release.sh`)**:
+    Builds the binary and packages it into local install targets (`AdvancedDock.dmg` and `AdvancedDock.zip`), injecting version details into the application bundle's `Info.plist`:
+    ```bash
+    # Usage: ./release.sh <version> <build_number>
+    ./release.sh 1.6 1
+    ```
+
+2.  **Publishing to GitHub (`publish_release.sh`)**:
+    Automates building, committing version updates, tagging the commit, pushing, and publishing directly to GitHub Releases:
+    ```bash
+    # Usage: ./publish_release.sh <version> <build_number>
+    ./publish_release.sh 1.6 1
+    ```
 
 ### Script Automation Features:
-*   **Commit & Tag Sequence**: Updates version metadata in `update.json`, creates a local tag, and pushes branches to GitHub.
-*   **Force-Pushes Tags**: Forces tag updates on GitHub (`git push origin -f "v$VERSION"`) to align git commits with release states.
-*   **Release Idempotency**: If the release already exists, the script automatically queries the release, deletes any old duplicate `AdvancedDock.dmg` asset using the GitHub Assets API, and re-uploads the new DMG without failing or interrupting the build lifecycle.
+*   **Version Injection**: Dynamically injects version and build numbers into the app bundle `Info.plist` during compilation.
+*   **Git Lifecycle**: Bumps commits, tags the commit locally, pushes to main, and force-pushes the release tag (`v$VERSION`) to ensure tag alignment.
+*   **Overwriting Existing Releases**: Uses the GitHub CLI (`gh release create --clobber`) to automatically update existing releases and overwrite the DMG/ZIP assets if they already exist, making the release cycle completely idempotent.
 
 ---
 

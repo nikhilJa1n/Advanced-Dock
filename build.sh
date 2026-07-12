@@ -1,6 +1,18 @@
 #!/bin/bash
 set -e
 
+# Production Versioning Defaults
+VERSION="1.6"
+BUILD_NUMBER="1"
+
+# Read version and build arguments if provided
+if [ ! -z "$1" ]; then
+    VERSION="$1"
+fi
+if [ ! -z "$2" ]; then
+    BUILD_NUMBER="$2"
+fi
+
 echo "=== Building Swift Package in Release Mode ==="
 swift build -c release
 
@@ -39,9 +51,9 @@ cat > "${APP_DIR}/Contents/Info.plist" <<EOF
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.6</string>
+    <string>${VERSION}</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>${BUILD_NUMBER}</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>LSUIElement</key>
