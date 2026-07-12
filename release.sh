@@ -48,81 +48,7 @@ if [ ! -f "$DMG_FILE" ]; then
     exit 1
 fi
 
-# 5. Check if release already exists on GitHub
-echo "=== Checking if release $VERSION exists on GitHub ==="
-RELEASE_CHECK_URL="https://api.github.com/repos/$OWNER/$REPO/releases/tags/v$VERSION"
-HTTP_STATUS=$(curl -o /dev/null -s -w "%{http_code}" -H "Authorization: token $GITHUB_TOKEN" "$RELEASE_CHECK_URL")
-
-if [ "$HTTP_STATUS" -eq 200 ]; then
-    echo "Error: Release v$VERSION already exists on GitHub. Increment your version inside build.sh before running this release script."
-    exit 1
-fi
-
-# 6. Generate Changelog from Git Commit History
-echo "=== Generating Changelog from Git Commit History ==="
-# Find the most recent tag reachable from HEAD that is NOT the current version tag
-PREV_TAG=$(git tag --merged HEAD | grep -E "^v" | grep -v "^v$VERSION$" | sort -V | tail -n 1 || true)
-
-if [ -n "$PREV_TAG" ]; then
-    echo "Found previous release tag: $PREV_TAG. Extracting commits from last deployed tag ($PREV_TAG) to newest commit..."
-    CHANGELOG=$(git log "${PREV_TAG}..HEAD" --pretty=format:"* %s" || true)
-else
-    echo "No previous release tag found. Extracting full commit history..."
-    CHANGELOG=$(git log --pretty=format:"* %s" || true)
-fi
-
-# Fallback if changelog is empty
-if [ -z "$CHANGELOG" ]; then
-    CHANGELOG="* Initial release package of version $VERSION."
-fi
-
-echo -e "Changelog Content:\n$CHANGELOG\n"
-
-# Create Release Post Payload with safely escaped JSON body using python
-echo "=== Preparing GitHub Release Payload ==="
-RELEASE_POST_DATA=$(python3 -c "import json, sys; print(json.dumps({
-  'tag_name': 'v' + sys.argv[1],
-  'target_commitish': 'main',
-  'name': 'v' + sys.argv[1],
-  'body': sys.argv[2],
-  'draft': False,
-  'prerelease': False
-}))" "$VERSION" "$CHANGELOG")
-
-RESPONSE=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-     -H "Content-Type: application/json" \
-     -d "$RELEASE_POST_DATA" \
-     "https://api.github.com/repos/$OWNER/$REPO/releases")
-
-# Parse Release ID and Upload URL from response
-RELEASE_ID=$(echo "$RESPONSE" | grep -m 1 "\"id\":" | awk '{print $2}' | tr -d ',')
-UPLOAD_URL=$(echo "$RESPONSE" | grep -m 1 "\"upload_url\":" | sed -E 's/.*"upload_url": "([^{]+).*/\1/')
-
-if [ -z "$RELEASE_ID" ] || [ -z "$UPLOAD_URL" ]; then
-    echo "Error: Failed to create release. API response:"
-    echo "$RESPONSE"
-    exit 1
-fi
-
-echo "Release created successfully (ID: $RELEASE_ID)."
-
-# 7. Upload AdvancedDock.dmg to the Release
-echo "=== Uploading AdvancedDock.dmg ==="
-UPLOAD_RESPONSE=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-     -H "Content-Type: application/octet-stream" \
-     --data-binary @"$DMG_FILE" \
-     "$UPLOAD_URL?name=AdvancedDock.dmg")
-
-UPLOAD_STATUS=$(echo "$UPLOAD_RESPONSE" | grep -m 1 "\"state\":" | awk '{print $2}' | tr -d '",')
-
-if [ "$UPLOAD_STATUS" != "uploaded" ]; then
-    echo "Warning: Upload response did not confirm success. API response:"
-    echo "$UPLOAD_RESPONSE"
-else
-    echo "AdvancedDock.dmg uploaded successfully!"
-fi
-
-# 8. Update update.json with new version details
+# 5. Update update.json with new version details
 echo "=== Updating update.json ==="
 cat > update.json <<EOF
 {
@@ -132,8 +58,8 @@ cat > update.json <<EOF
 }
 EOF
 
-# 9. Commit, tag, and push changes to GitHub
-echo "=== Committing and tagging release ==="
+# 6. Commit, tag, and push changes to GitHub locally
+echo "=== Committing and tagging release locally ==="
 git add update.json
 git commit -m "Bump update.json to v$VERSION" || true
 
@@ -143,6 +69,93 @@ git tag -a "v$VERSION" -m "Release v$VERSION"
 
 # Push the main branch and only the newly created tag to origin
 echo "=== Pushing commits and tag to GitHub ==="
-git push origin main "v$VERSION" || true
+git push origin main || true
+git push origin -f "v$VERSION" || true
+
+# 7. Check if release already exists on GitHub
+echo "=== Checking if release v$VERSION exists on GitHub ==="
+RELEASE_CHECK_URL="https://api.github.com/repos/$OWNER/$REPO/releases/tags/v$VERSION"
+RESPONSE_INFO=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$RELEASE_CHECK_URL")
+HTTP_STATUS=$(curl -o /dev/null -s -w "%{http_code}" -H "Authorization: token $GITHUB_TOKEN" "$RELEASE_CHECK_URL")
+
+if [ "$HTTP_STATUS" -eq 200 ]; then
+    echo "Release v$VERSION already exists. Fetching existing release details..."
+    RELEASE_ID=$(echo "$RESPONSE_INFO" | python3 -c "import json, sys; d=sys.stdin.read().strip(); print(json.loads(d).get('id', '') if d else '')")
+    UPLOAD_URL=$(echo "$RESPONSE_INFO" | python3 -c "import json, sys; d=sys.stdin.read().strip(); print(json.loads(d).get('upload_url', '') if d else '')" | sed -E 's/([^{]+).*/\1/')
+    
+    if [ -z "$RELEASE_ID" ] || [ -z "$UPLOAD_URL" ]; then
+        echo "Error: Could not retrieve existing release ID/Upload URL."
+        exit 1
+    fi
+    
+    echo "Existing Release ID: $RELEASE_ID. Checking for existing AdvancedDock.dmg asset..."
+    ASSETS_JSON=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/$OWNER/$REPO/releases/$RELEASE_ID/assets")
+    ASSET_ID=$(echo "$ASSETS_JSON" | python3 -c "import json, sys; d=sys.stdin.read().strip(); assets=json.loads(d) if d else []; print(next((a['id'] for a in assets if a['name'] == 'AdvancedDock.dmg'), ''))")
+    
+    if [ -n "$ASSET_ID" ]; then
+        echo "Deleting old AdvancedDock.dmg asset (ID: $ASSET_ID)..."
+        curl -s -X DELETE -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/$OWNER/$REPO/releases/assets/$ASSET_ID"
+    fi
+else
+    # Create new release
+    echo "=== Generating Changelog from Git Commit History ==="
+    # Find the most recent tag reachable from HEAD that is NOT the current version tag
+    PREV_TAG=$(git tag --merged HEAD | grep -E "^v" | grep -v "^v$VERSION$" | sort -V | tail -n 1 || true)
+    
+    if [ -n "$PREV_TAG" ]; then
+        echo "Found previous release tag: $PREV_TAG. Extracting commits from last deployed tag ($PREV_TAG) to newest commit..."
+        CHANGELOG=$(git log "${PREV_TAG}..HEAD" --pretty=format:"* %s" || true)
+    else
+        echo "No previous release tag found. Extracting full commit history..."
+        CHANGELOG=$(git log --pretty=format:"* %s" || true)
+    fi
+    
+    if [ -z "$CHANGELOG" ]; then
+        CHANGELOG="* Initial release package of version $VERSION."
+    fi
+    
+    echo -e "Changelog Content:\n$CHANGELOG\n"
+    
+    echo "=== Creating new release on GitHub ==="
+    RELEASE_POST_DATA=$(python3 -c "import json, sys; print(json.dumps({
+      'tag_name': 'v' + sys.argv[1],
+      'target_commitish': 'main',
+      'name': 'v' + sys.argv[1],
+      'body': sys.argv[2],
+      'draft': False,
+      'prerelease': False
+    }))" "$VERSION" "$CHANGELOG")
+    
+    RESPONSE=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+         -H "Content-Type: application/json" \
+         -d "$RELEASE_POST_DATA" \
+         "https://api.github.com/repos/$OWNER/$REPO/releases")
+         
+    RELEASE_ID=$(echo "$RESPONSE" | python3 -c "import json, sys; d=sys.stdin.read().strip(); print(json.loads(d).get('id', '') if d else '')")
+    UPLOAD_URL=$(echo "$RESPONSE" | python3 -c "import json, sys; d=sys.stdin.read().strip(); print(json.loads(d).get('upload_url', '') if d else '')" | sed -E 's/([^{]+).*/\1/')
+    
+    if [ -z "$RELEASE_ID" ] || [ -z "$UPLOAD_URL" ]; then
+        echo "Error: Failed to create new release. API response:"
+        echo "$RESPONSE"
+        exit 1
+    fi
+    echo "New release created successfully (ID: $RELEASE_ID)."
+fi
+
+# 8. Upload AdvancedDock.dmg to the Release
+echo "=== Uploading AdvancedDock.dmg ==="
+UPLOAD_RESPONSE=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+     -H "Content-Type: application/octet-stream" \
+     --data-binary @"$DMG_FILE" \
+     "$UPLOAD_URL?name=AdvancedDock.dmg")
+
+UPLOAD_STATUS=$(echo "$UPLOAD_RESPONSE" | python3 -c "import json, sys; d=sys.stdin.read().strip(); print(json.loads(d).get('state', '') if d else '')")
+
+if [ "$UPLOAD_STATUS" != "uploaded" ]; then
+    echo "Warning: Upload response did not confirm success. API response:"
+    echo "$UPLOAD_RESPONSE"
+else
+    echo "AdvancedDock.dmg uploaded successfully!"
+fi
 
 echo "=== Release v$VERSION published successfully! ==="

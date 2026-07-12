@@ -18,10 +18,12 @@ Built natively in Swift and SwiftUI, AdvancedDock runs as a highly efficient bac
 
 ### 1. Smart App Switcher (`⌥ + Tab`)
 *   **Quick Switch**: Hold `⌥ (Option)` and tap `Tab` to cycle between windows. Release `⌥` to switch immediately.
-*   **Window Cards & Thumbnails**: Real-time window preview cards featuring app-badge icons. Drag a card upwards to close the window instantly.
+*   **Tracked MRU Sorting**: The default "Recently Used" layout is sorted by your custom tracked MRU history (`mruWindowIDs`). This guarantees that recently used windows always show up first, preventing lag or incorrect window order shuffling caused by the OS Window Server.
+*   **Grid Layout Mode**: Toggle between standard horizontally paginated single row switcher (5 columns) and a dynamic 2D multi-row grid switcher (4 columns). Grid mode dynamically adjusts window dimensions, centers items, and aligns columns cleanly on the final row using layout placeholders.
+*   **Dynamic Arrow Navigation**: Cycle through card highlights using Left (←) / Right (→) or Up (↓) / Down (↑) arrow keys, with grid boundaries adjusting automatically depending on the active layout mode.
+*   **Window Cards & Thumbnails**: Real-time window preview cards featuring app-badge icons. Drag a card upwards to close the window instantly. (Hover highlights have been removed to ensure selection changes only occur via deliberate keyboard controls or mouse clicks).
 *   **Aero Action Panel**: Quick window controls directly from the card (Close, Minimize, Maximize, Exit Full-Screen, Force Quit).
 *   **Window Snapping**: Snap windows to the left half, right half, or maximize them instantly with one click.
-*   **Minimalist Row Layout**: Cycles through open windows using a clean, single horizontal row of card previews centered on your screen, focusing purely on speed and simplicity.
 
 ### 2. Interactive Dock Previews
 *   Hover over any active Dock icon to see real-time floating thumbnails of that application's open windows.
@@ -31,15 +33,16 @@ Built natively in Swift and SwiftUI, AdvancedDock runs as a highly efficient bac
 *   **Customizable Sizing**: Adjust the dock hover preview thumbnail size independently from 70% to 200% using a dedicated slider in the Control Panel settings.
 
 ### 3. Personalization & Control
-*   **Segmented Control Panel Dashboard**: Fully redesigned tabbed navigation separating General settings, Dock Previews, Exclusions, Diagnostics, and Help.
+*   **Segmented Control Panel Dashboard**: Fully redesigned tabbed navigation separating General settings, Dock Previews, Hotkeys & Exclusions, Diagnostics, and Help.
 *   **App Snapping Presets (Grid Manager)**: Instantly snap all open windows of any running application into a clean layout: *2x2 Grid*, *3-Column Split*, or *70/30 Split* via the General Preferences dashboard.
 *   **Customizable Hotkeys**: Record your own global activation shortcut (e.g. `⌥ + Space` or `⌘ + Tab`) via the settings shortcut recorder.
 *   **App Exclusions Blocklist & Search**: Filter and exclude running applications from showing up in the switcher HUD cycle.
 *   **Adjustable Dock Preview Delay**: Defer hover previews using a slider setting (0.1s to 1.5s) to prevent accidental overlays.
 *   **System Diagnostics & Telemetry**: Monitor real-time CPU and RAM utilization directly inside the Diagnostics tab with sleek linear meters.
 *   **Settings Factory Reset**: Restore the entire app to pristine native configurations with a single click.
-*   **Modern ScreenCaptureKit Previews**: Uses Apple's modern, performant `ScreenCaptureKit` API for capturing window thumbnails, reducing CPU load and removing legacy warnings.
+*   **Modern ScreenCaptureKit & AppleScript Previews**: Uses Apple's modern, performant `ScreenCaptureKit` API for capturing window thumbnails, and incorporates an AppleScript fallback activation for all applications (including Chrome and Notes) when standard AX window raising fails.
 *   **Live Resource Widget**: Real-time glassmorphic CPU and RAM statistics monitor located in the top-right corner of the switcher HUD.
+
 ---
 
 ## 📸 Preview & Aesthetics
@@ -124,6 +127,26 @@ To compile, package, and install AdvancedDock into your Applications folder:
 This compiles the release binary, signs it, and packages it into a ready-to-distribute compressed disk image: **`AdvancedDock.dmg`**.
 
 3.  Double-click **`AdvancedDock.dmg`** and drag-and-drop the application into your **Applications** folder to install it.
+
+### Publishing Releases
+
+AdvancedDock includes a fully automated and idempotent release publisher script (`release.sh`) that manages tags, commits, updates version config files, and publishes assets directly to GitHub Releases.
+
+#### Prerequisites
+*   A **GitHub Personal Access Token (PAT)** with `repo` scope.
+
+#### Publishing Steps
+1.  Run the release script:
+    ```bash
+    chmod +x release.sh
+    ./release.sh
+    ```
+2.  Enter your GitHub PAT when prompted (or pass it directly via environment variable: `GITHUB_TOKEN=your_pat ./release.sh`).
+
+#### What the script automates:
+*   **Version Bumping**: Automatically writes release info to `update.json`.
+*   **Git Lifecycle**: Bumps commits, tags the commit locally, pushes `main`, and force-pushes the release tag (`v$VERSION`) to ensure the tag points to the final release commit.
+*   **Self-Healing / Idempotency**: If the release tag already exists on GitHub, the script fetches the existing release, queries the release assets, deletes any attached `AdvancedDock.dmg` asset, and uploads the fresh package without throwing errors.
 
 ---
 
