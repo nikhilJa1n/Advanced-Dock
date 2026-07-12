@@ -4,8 +4,8 @@
   <a href="https://apple.com"><img src="https://img.shields.io/badge/platform-macOS%2014.0%2B-blue.svg?style=flat-square" alt="Platform" /></a>
   <a href="https://swift.org"><img src="https://img.shields.io/badge/language-Swift%205.9-orange.svg?style=flat-square" alt="Language" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg?style=flat-square" alt="License" /></a>
-  <a href="https://github.com/nikhilJa1n/Advanced-Dock/actions"><img src="https://img.shields.io/badge/build-passing-brightgreen.svg?style=flat-square" alt="Build Status" /></a>
-  <a href="https://github.com/nikhilJa1n/Advanced-Dock/releases"><img src="https://img.shields.io/github/v/release/nikhilJa1n/Advanced-Dock?style=flat-square" alt="Latest Release" /></a>
+  <a href="https://github.com/nikhilJa1n/OptTab-MAC/actions"><img src="https://img.shields.io/badge/build-passing-brightgreen.svg?style=flat-square" alt="Build Status" /></a>
+  <a href="https://github.com/nikhilJa1n/OptTab-MAC/releases"><img src="https://img.shields.io/github/v/release/nikhilJa1n/OptTab-MAC?style=flat-square" alt="Latest Release" /></a>
 </p>
 
 **OptTab** is a next-generation window manager and interactive switcher HUD designed to replace the default macOS app switcher and dock experiences. Built natively in Swift and SwiftUI, it introduces a beautiful glassmorphic interface, dynamic layouts, and hardware-accelerated preview controls—all while running as a zero-latency, lightweight background agent.
@@ -100,8 +100,8 @@ To compile, code-sign, and package OptTab:
 
 1.  Clone the repository:
     ```bash
-    git clone https://github.com/nikhilJa1n/Advanced-Dock.git
-    cd Advanced-Dock
+    git clone https://github.com/nikhilJa1n/OptTab-MAC.git
+    cd OptTab-MAC
     ```
 
 2.  Run the build, signing, and packaging script:

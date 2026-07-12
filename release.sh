@@ -16,7 +16,7 @@ fi
 # Get repository details from remote URL
 REMOTE_URL=$(git config --get remote.origin.url || true)
 OWNER="nikhilJa1n"
-REPO="Advanced-Dock"
+REPO="OptTab-MAC"
 if [[ "$REMOTE_URL" =~ github.com[:/]([^/]+)/([^.]+)(.git)? ]]; then
     OWNER="${BASH_REMATCH[1]}"
     REPO="${BASH_REMATCH[2]}"
