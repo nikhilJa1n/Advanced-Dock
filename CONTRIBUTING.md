@@ -1,13 +1,13 @@
-# Contributing to AdvancedDock
+# Contributing to OptTab
 
-Thank you for your interest in contributing to AdvancedDock! Contributions are what make the open-source community such an amazing place to learn, inspire, and create.
+Thank you for your interest in contributing to OptTab! Contributions are what make the open-source community such an amazing place to learn, inspire, and create.
 
 ---
 
 ## How Can I Contribute?
 
 ### 1. Reporting Bugs
-*   Check the [Issues](https://github.com/yourusername/AdvancedDock/issues) page to see if the bug has already been reported.
+*   Check the [Issues](https://github.com/nikhilJa1n/OptTab-MAC/issues) page to see if the bug has already been reported.
 *   If not, open a new issue. Clearly describe the problem, steps to reproduce, and your system specs (macOS version, Mac model).
 
 ### 2. Suggesting Enhancements
@@ -25,7 +25,7 @@ Thank you for your interest in contributing to AdvancedDock! Contributions are w
 
 ## Development Setup
 
-AdvancedDock is a Swift Package Manager executable target.
+OptTab is a Swift Package Manager executable target.
 
 1.  Open the workspace folder in Xcode (Xcode will automatically resolve targets using the `Package.swift` manifest).
 2.  Use the `build.sh` script to bundle the application (`./build.sh`).

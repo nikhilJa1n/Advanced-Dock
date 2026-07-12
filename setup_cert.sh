@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-CERT_NAME="AdvancedDockDeveloper"
+CERT_NAME="OptTabDeveloper"
 
 # Create OpenSSL config file
 cat > codesign.cnf <<EOF

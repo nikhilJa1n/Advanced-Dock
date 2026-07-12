@@ -67,8 +67,8 @@ cat > "${APP_DIR}/Contents/Info.plist" <<EOF
 EOF
 
 # Sign the app bundle
-echo "=== Signing App Bundle with AdvancedDockDeveloper Certificate ==="
-codesign --force --deep --sign "AdvancedDockDeveloper" "${APP_DIR}"
+echo "=== Signing App Bundle with OptTabDeveloper Certificate ==="
+codesign --force --deep --sign "OptTabDeveloper" "${APP_DIR}"
 
 echo "=== App Bundle created successfully at ${APP_DIR} ==="
 

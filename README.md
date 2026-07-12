@@ -92,7 +92,7 @@ graph TD
 
 ### Prerequisites
 *   Xcode 15.0 or newer (Swift 5.9+ compiler tools).
-*   A code-signing certificate (self-signed or developer account) named `AdvancedDockDeveloper`.
+*   A code-signing certificate (self-signed or developer account) named `OptTabDeveloper`.
 
 ### Building from Source
 
