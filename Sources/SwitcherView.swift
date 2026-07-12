@@ -37,7 +37,6 @@ struct SwitcherView: View {
     let windows: [WindowInfo]
     let currentIndex: Int
     let scale: Double
-    let enableHoverSwitch: Bool
     let refreshToken: UUID
     let onHoverIndex: (Int) -> Void
     let onClickIndex: (Int) -> Void
@@ -72,12 +71,16 @@ struct SwitcherView: View {
     var body: some View {
         let cardWidth = 170.0 * scale
         let spacing = 20.0 * scale
-        let totalCardsWidth = cardWidth * Double(gridCols)
-        let totalSpacingWidth = spacing * Double(gridCols - 1)
+        
+        let cols = appState.useGridLayout ? (min(windows.count, 4) > 0 ? min(windows.count, 4) : 4) : gridCols
+        let rows = appState.useGridLayout ? max(1, Int(ceil(Double(windows.count) / Double(cols)))) : 1
+        
+        let totalCardsWidth = cardWidth * Double(cols)
+        let totalSpacingWidth = spacing * Double(cols - 1)
         let contentWidth = totalCardsWidth + totalSpacingWidth
         
         let cardTotalHeight = 132.0 * scale // 106 height + 10 spacing + 16 text
-        let gridHeight = cardTotalHeight
+        let gridHeight = appState.useGridLayout ? (cardTotalHeight * Double(rows) + spacing * Double(rows - 1)) : cardTotalHeight
         
         VStack(spacing: 16) {
             // Selected Window Title Banner
@@ -117,47 +120,85 @@ struct SwitcherView: View {
                 .frame(height: 44)
             }
             
-            // Paginated Container Box with stable dimensions
+            // Container Box (Grid or Paginated Horizontal Row)
             VStack(spacing: 12) {
-                HStack(spacing: CGFloat(spacing)) {
-                    Spacer()
-                    let start = currentPage * pageSize
-                    let end = min(start + pageSize, windows.count)
-                    
-                    ForEach(start..<end, id: \.self) { cardIndex in
-                        let window = windows[cardIndex]
-                        WindowCard(
-                            window: window,
-                            isSelected: cardIndex == currentIndex,
-                            scale: scale,
-                            enableHoverSwitch: enableHoverSwitch,
-                            refreshToken: refreshToken,
-                            onHover: { onHoverIndex(cardIndex) },
-                            onClick: { onClickIndex(cardIndex) },
-                            appState: appState
-                        )
-                        .id(window.id)
-                    }
-                    Spacer()
-                }
-                .frame(height: CGFloat(gridHeight + 15), alignment: .center)
-                
-                // Page Indicator Dots
-                let totalPages = Int(ceil(Double(windows.count) / Double(pageSize)))
-                if totalPages > 1 {
-                    HStack(spacing: 8) {
-                        ForEach(0..<totalPages, id: \.self) { pageIndex in
-                            Circle()
-                                .fill(pageIndex == currentPage ? Color.blue : Color.white.opacity(0.3))
-                                .frame(width: 6, height: 6)
-                                .scaleEffect(pageIndex == currentPage ? 1.2 : 1.0)
-                                .animation(.spring(response: 0.25, dampingFraction: 0.7), value: currentPage)
+                if appState.useGridLayout {
+                    // 2D Grid Layout
+                    VStack(spacing: CGFloat(spacing)) {
+                        ForEach(0..<rows, id: \.self) { rowIndex in
+                            HStack(spacing: CGFloat(spacing)) {
+                                let start = rowIndex * cols
+                                let end = min(start + cols, windows.count)
+                                
+                                ForEach(start..<end, id: \.self) { cardIndex in
+                                    let window = windows[cardIndex]
+                                    WindowCard(
+                                        window: window,
+                                        isSelected: cardIndex == currentIndex,
+                                        scale: scale,
+                                        refreshToken: refreshToken,
+                                        onHover: { onHoverIndex(cardIndex) },
+                                        onClick: { onClickIndex(cardIndex) },
+                                        appState: appState
+                                    )
+                                    .id(window.id)
+                                }
+                                
+                                if (end - start) < cols {
+                                    ForEach(0..<(cols - (end - start)), id: \.self) { _ in
+                                        Color.clear
+                                            .frame(width: CGFloat(cardWidth), height: CGFloat(cardTotalHeight))
+                                    }
+                                }
+                            }
                         }
                     }
-                    .frame(height: 10)
-                } else {
+                    .frame(height: CGFloat(gridHeight + 15), alignment: .center)
+                    
+                    // No dots page indicator needed in grid layout
                     Color.clear
                         .frame(height: 10)
+                } else {
+                    // Paginated Horizontal Row
+                    HStack(spacing: CGFloat(spacing)) {
+                        Spacer()
+                        let start = currentPage * pageSize
+                        let end = min(start + pageSize, windows.count)
+                        
+                        ForEach(start..<end, id: \.self) { cardIndex in
+                            let window = windows[cardIndex]
+                            WindowCard(
+                                window: window,
+                                isSelected: cardIndex == currentIndex,
+                                scale: scale,
+                                refreshToken: refreshToken,
+                                onHover: { onHoverIndex(cardIndex) },
+                                onClick: { onClickIndex(cardIndex) },
+                                appState: appState
+                            )
+                            .id(window.id)
+                        }
+                        Spacer()
+                    }
+                    .frame(height: CGFloat(gridHeight + 15), alignment: .center)
+                    
+                    // Page Indicator Dots
+                    let totalPages = Int(ceil(Double(windows.count) / Double(pageSize)))
+                    if totalPages > 1 {
+                        HStack(spacing: 8) {
+                            ForEach(0..<totalPages, id: \.self) { pageIndex in
+                                Circle()
+                                    .fill(pageIndex == currentPage ? Color.blue : Color.white.opacity(0.3))
+                                    .frame(width: 6, height: 6)
+                                    .scaleEffect(pageIndex == currentPage ? 1.2 : 1.0)
+                                    .animation(.spring(response: 0.25, dampingFraction: 0.7), value: currentPage)
+                            }
+                        }
+                        .frame(height: 10)
+                    } else {
+                        Color.clear
+                            .frame(height: 10)
+                    }
                 }
             }
             
@@ -235,7 +276,6 @@ struct WindowCard: View {
     let window: WindowInfo
     let isSelected: Bool
     let scale: Double
-    let enableHoverSwitch: Bool
     let refreshToken: UUID
     let onHover: () -> Void
     let onClick: () -> Void
@@ -251,7 +291,6 @@ struct WindowCard: View {
                 window: window,
                 isSelected: isSelected,
                 scale: scale,
-                enableHoverSwitch: enableHoverSwitch,
                 refreshToken: refreshToken,
                 onHover: onHover,
                 onClick: onClick,
@@ -305,7 +344,6 @@ struct CardThumbnailView: View {
     let window: WindowInfo
     let isSelected: Bool
     let scale: Double
-    let enableHoverSwitch: Bool
     let refreshToken: UUID
     let onHover: () -> Void
     let onClick: () -> Void
@@ -439,11 +477,6 @@ struct CardThumbnailView: View {
                     }
                 }
         )
-        .onHover { isHovered in
-            if isHovered && enableHoverSwitch && !isSelected {
-                onHover()
-            }
-        }
         .onTapGesture {
             onClick()
         }

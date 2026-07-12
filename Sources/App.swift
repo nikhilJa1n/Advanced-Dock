@@ -326,7 +326,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotkeyManagerDelegate {
             windows: activeWindows,
             currentIndex: currentIndex,
             scale: appState.thumbnailScale,
-            enableHoverSwitch: appState.enableHoverSwitch,
             onHover: { [weak self] i in self?.handleHoverIndex(i) },
             onClick: { [weak self] i in self?.handleClickIndex(i) }
         )
@@ -428,7 +427,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotkeyManagerDelegate {
                 windows: activeWindows,
                 currentIndex: currentIndex,
                 scale: appState.thumbnailScale,
-                enableHoverSwitch: appState.enableHoverSwitch,
                 onHover: { [weak self] index in self?.handleHoverIndex(index) },
                 onClick: { [weak self] index in self?.handleClickIndex(index) }
             )
@@ -455,7 +453,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotkeyManagerDelegate {
                 windows: activeWindows,
                 currentIndex: currentIndex,
                 scale: appState.thumbnailScale,
-                enableHoverSwitch: appState.enableHoverSwitch,
                 onHover: { [weak self] index in self?.handleHoverIndex(index) },
                 onClick: { [weak self] index in self?.handleClickIndex(index) }
             )
@@ -485,7 +482,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotkeyManagerDelegate {
         guard appState.enableArrowNavigation else { return }
         guard switcherWindow?.isVisible ?? false, !activeWindows.isEmpty else { return }
         
-        let cols = min(activeWindows.count, 5) > 0 ? min(activeWindows.count, 5) : 5
+        let cols = appState.useGridLayout ? (min(activeWindows.count, 4) > 0 ? min(activeWindows.count, 4) : 4) : (min(activeWindows.count, 5) > 0 ? min(activeWindows.count, 5) : 5)
         if up {
             currentIndex -= cols
             if currentIndex < 0 {
@@ -514,7 +511,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotkeyManagerDelegate {
             windows: activeWindows,
             currentIndex: currentIndex,
             scale: appState.thumbnailScale,
-            enableHoverSwitch: appState.enableHoverSwitch,
             onHover: { [weak self] index in self?.handleHoverIndex(index) },
             onClick: { [weak self] index in self?.handleClickIndex(index) }
         )

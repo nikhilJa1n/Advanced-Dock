@@ -18,10 +18,6 @@ class AppState: ObservableObject {
         didSet { UserDefaults.standard.set(enableArrowNavigation, forKey: "enableArrowNavigation") }
     }
     
-    @Published var enableHoverSwitch: Bool {
-        didSet { UserDefaults.standard.set(enableHoverSwitch, forKey: "enableHoverSwitch") }
-    }
-    
     @Published var thumbnailScale: Double {
         didSet { UserDefaults.standard.set(thumbnailScale, forKey: "thumbnailScale") }
     }
@@ -67,11 +63,14 @@ class AppState: ObservableObject {
         didSet { UserDefaults.standard.set(dockHoverDelay, forKey: "dockHoverDelay") }
     }
     
+    @Published var useGridLayout: Bool {
+        didSet { UserDefaults.standard.set(useGridLayout, forKey: "useGridLayout") }
+    }
+    
     private var timer: AnyCancellable?
     
     init() {
         self.enableArrowNavigation = UserDefaults.standard.object(forKey: "enableArrowNavigation") as? Bool ?? true
-        self.enableHoverSwitch = UserDefaults.standard.object(forKey: "enableHoverSwitch") as? Bool ?? false
         let scaleVal = UserDefaults.standard.double(forKey: "thumbnailScale")
         self.thumbnailScale = scaleVal == 0 ? 1.0 : scaleVal
         self.showMinimized = UserDefaults.standard.object(forKey: "showMinimized") as? Bool ?? true
@@ -94,13 +93,14 @@ class AppState: ObservableObject {
         let delayVal = UserDefaults.standard.double(forKey: "dockHoverDelay")
         self.dockHoverDelay = delayVal == 0 ? 0.15 : delayVal
         
+        self.useGridLayout = UserDefaults.standard.object(forKey: "useGridLayout") as? Bool ?? false
+        
         checkPermissions()
         startPermissionPolling()
     }
     
     func resetToDefaults() {
         self.enableArrowNavigation = true
-        self.enableHoverSwitch = false
         self.thumbnailScale = 1.0
         self.showMinimized = true
         self.showAllSpaces = false
@@ -111,9 +111,9 @@ class AppState: ObservableObject {
         self.hotkeyModifiers = 2
         self.excludedApps = []
         self.dockHoverDelay = 0.15
+        self.useGridLayout = false
         
         UserDefaults.standard.removeObject(forKey: "enableArrowNavigation")
-        UserDefaults.standard.removeObject(forKey: "enableHoverSwitch")
         UserDefaults.standard.removeObject(forKey: "thumbnailScale")
         UserDefaults.standard.removeObject(forKey: "showMinimized")
         UserDefaults.standard.removeObject(forKey: "showAllSpaces")
@@ -124,6 +124,7 @@ class AppState: ObservableObject {
         UserDefaults.standard.removeObject(forKey: "hotkeyModifiers")
         UserDefaults.standard.removeObject(forKey: "excludedApps")
         UserDefaults.standard.removeObject(forKey: "dockHoverDelay")
+        UserDefaults.standard.removeObject(forKey: "useGridLayout")
     }
     
     func checkPermissions() {
@@ -442,9 +443,9 @@ struct GeneralTab: View {
                         .background(Color.white.opacity(0.04))
                     
                     ToggleRow(
-                        title: "Enable Mouse Hover Switch",
-                        description: "Highlight window cards automatically when hovering the mouse cursor.",
-                        isOn: $state.enableHoverSwitch
+                        title: "Grid Layout Mode",
+                        description: "Arrange switcher thumbnails in a 2D multi-row grid instead of a single paginated horizontal row.",
+                        isOn: $state.useGridLayout
                     )
                 }
                 
