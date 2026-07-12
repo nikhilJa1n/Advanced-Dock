@@ -663,59 +663,68 @@ class WindowList {
             return false
         }
         
-        // AppleScript fallback for Chromium-based apps (Chrome, Edge, Brave, Arc, etc.)
-        // Chrome's AX tree doesn't expose all physical windows, but AppleScript can switch them by title.
+        // AppleScript fallback for applications when standard AX activation fails.
+        // For Chromium apps, searches and brings the target window forward by title.
+        // For standard apps (like Notes, Finder, etc.), sends a reopen and activate event to unminimize/raise its windows.
         func tryAppleScriptRaise() -> Bool {
             let chromiumApps = ["Google Chrome", "Google Chrome Canary", "Chromium", "Microsoft Edge", "Brave Browser", "Arc", "Vivaldi", "Opera"]
-            guard chromiumApps.contains(window.ownerName) else { return false }
             
-            // Build a partial title for matching (CGWindowList truncates with "…")
-            let targetTitle = window.title
+            let script: String
+            let appScriptName = window.ownerName
             
-            // Use the app's scripting name (usually same as display name for Chrome)
-            let appScriptName: String
-            switch window.ownerName {
-            case "Google Chrome Canary": appScriptName = "Google Chrome Canary"
-            case "Microsoft Edge": appScriptName = "Microsoft Edge"
-            case "Brave Browser": appScriptName = "Brave Browser"
-            default: appScriptName = window.ownerName
-            }
-            
-            // AppleScript: iterate windows in Chrome, find the one whose title contains our target fragments,
-            // then set its index to 1 to bring it to the front
-            var titleFragments: [String] = []
-            if targetTitle.contains("…") {
-                titleFragments = targetTitle.components(separatedBy: "…")
-                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                    .filter { !$0.isEmpty }
+            if chromiumApps.contains(appScriptName) {
+                // Chromium specific title-based activation
+                let targetTitle = window.title
+                let resolvedScriptName: String
+                switch appScriptName {
+                case "Google Chrome Canary": resolvedScriptName = "Google Chrome Canary"
+                case "Microsoft Edge": resolvedScriptName = "Microsoft Edge"
+                case "Brave Browser": resolvedScriptName = "Brave Browser"
+                default: resolvedScriptName = appScriptName
+                }
+                
+                var titleFragments: [String] = []
+                if targetTitle.contains("…") {
+                    titleFragments = targetTitle.components(separatedBy: "…")
+                        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                        .filter { !$0.isEmpty }
+                } else {
+                    titleFragments = [targetTitle]
+                }
+                
+                var conditions: [String] = []
+                for fragment in titleFragments {
+                    let escaped = fragment.replacingOccurrences(of: "\\", with: "\\\\")
+                        .replacingOccurrences(of: "\"", with: "\\\"")
+                    conditions.append("winTitle contains \"\(escaped)\"")
+                }
+                let conditionStr = conditions.joined(separator: " and ")
+                
+                script = """
+                tell application "\(resolvedScriptName)"
+                    set winCount to count of windows
+                    repeat with i from 1 to winCount
+                        set winTitle to title of window i
+                        if \(conditionStr) then
+                            set index of window i to 1
+                            return "ok"
+                        end if
+                    end repeat
+                    return "not_found"
+                end tell
+                """
+                logMessage("      AppleScript fallback: Running Chromium title script for '\(resolvedScriptName)'")
             } else {
-                titleFragments = [targetTitle]
+                // General App fallback (e.g. Notes, Finder, Mail)
+                script = """
+                tell application "\(appScriptName)"
+                    reopen
+                    activate
+                    return "ok"
+                end tell
+                """
+                logMessage("      AppleScript fallback: Running generic reopen/activate script for '\(appScriptName)'")
             }
-            
-            // Build an AppleScript condition from fragments
-            var conditions: [String] = []
-            for fragment in titleFragments {
-                let escaped = fragment.replacingOccurrences(of: "\\", with: "\\\\")
-                    .replacingOccurrences(of: "\"", with: "\\\"")
-                conditions.append("winTitle contains \"\(escaped)\"")
-            }
-            let conditionStr = conditions.joined(separator: " and ")
-            
-            let script = """
-            tell application "\(appScriptName)"
-                set winCount to count of windows
-                repeat with i from 1 to winCount
-                    set winTitle to title of window i
-                    if \(conditionStr) then
-                        set index of window i to 1
-                        return "ok"
-                    end if
-                end repeat
-                return "not_found"
-            end tell
-            """
-            
-            logMessage("      AppleScript fallback: Running script for '\(appScriptName)' with condition: \(conditionStr)")
             
             if let appleScript = NSAppleScript(source: script) {
                 var errorInfo: NSDictionary?
