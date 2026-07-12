@@ -1,4 +1,4 @@
-# <img src="screenshots/app_icon.jpg" width="48" height="48" align="center" style="border-radius:10px; margin-right:10px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" /> AdvancedDock
+# <img src="screenshots/app_icon.jpg" width="48" height="48" align="center" style="border-radius:10px; margin-right:10px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" /> OptTab
 
 <p align="left">
   <a href="https://apple.com"><img src="https://img.shields.io/badge/platform-macOS%2014.0%2B-blue.svg?style=flat-square" alt="Platform" /></a>
@@ -8,13 +8,13 @@
   <a href="https://github.com/nikhilJa1n/Advanced-Dock/releases"><img src="https://img.shields.io/github/v/release/nikhilJa1n/Advanced-Dock?style=flat-square" alt="Latest Release" /></a>
 </p>
 
-**AdvancedDock** is a next-generation window manager and interactive switcher HUD designed to replace the default macOS app switcher and dock experiences. Built natively in Swift and SwiftUI, it introduces a beautiful glassmorphic interface, dynamic layouts, and hardware-accelerated preview controls—all while running as a zero-latency, lightweight background agent.
+**OptTab** is a next-generation window manager and interactive switcher HUD designed to replace the default macOS app switcher and dock experiences. Built natively in Swift and SwiftUI, it introduces a beautiful glassmorphic interface, dynamic layouts, and hardware-accelerated preview controls—all while running as a zero-latency, lightweight background agent.
 
 ---
 
 ## 🚀 Architectural Blueprint
 
-AdvancedDock operates by tapping directly into the macOS window server event stream, using a decoupled event-driven architecture to keep CPU overhead minimal.
+OptTab operates by tapping directly into the macOS window server event stream, using a decoupled event-driven architecture to keep CPU overhead minimal.
 
 ```mermaid
 graph TD
@@ -60,7 +60,7 @@ graph TD
 *   **Segmented Control Panel**: Configure General Settings, Dock Previews, Exclusions, and Telemetry in a beautifully unified 5-tab dashboard.
 *   **Window Snapping Presets**: Instantly arrange open windows of any running application into a *2x2 Grid*, *3-Column Split*, or *70/30 Split* via the Grid Manager.
 *   **App Exclusions Search**: Search and blacklist background processes or chat helper apps from entering your switcher cycle.
-*   **Settings Factory Reset**: Restore AdvancedDock to default native configurations in a single click.
+*   **Settings Factory Reset**: Restore OptTab to default native configurations in a single click.
 
 ---
 
@@ -82,7 +82,7 @@ graph TD
 
 *   **Operating System**: macOS 14.0 (Sonoma) or newer.
 *   **Security & Privacy Policy**:
-    *   AdvancedDock operates **entirely locally**. No screen data, window titles, keystrokes, or process lists are ever transmitted, saved, or sent over a network.
+    *   OptTab operates **entirely locally**. No screen data, window titles, keystrokes, or process lists are ever transmitted, saved, or sent over a network.
     *   **Accessibility API**: Required to retrieve window titles and control windows (minimize, maximize, close, and snap).
     *   **Screen Recording Permission**: Required by Apple's `ScreenCaptureKit` to grab window graphics and display them as switcher card thumbnails.
 
@@ -96,7 +96,7 @@ graph TD
 
 ### Building from Source
 
-To compile, code-sign, and package AdvancedDock:
+To compile, code-sign, and package OptTab:
 
 1.  Clone the repository:
     ```bash
@@ -110,16 +110,16 @@ To compile, code-sign, and package AdvancedDock:
     ./build.sh
     ```
 
-This generates **`AdvancedDock.dmg`**. Drag-and-drop the app bundle inside it to your `/Applications` directory.
+This generates **`OptTab.dmg`**. Drag-and-drop the app bundle inside it to your `/Applications` directory.
 
 ---
 
 ## 🚀 Publishing Releases
 
-AdvancedDock uses a modular, two-tier release workflow based on the GitHub CLI (`gh`):
+OptTab uses a modular, two-tier release workflow based on the GitHub CLI (`gh`):
 
 1.  **Local Packaging (`release.sh`)**:
-    Builds the binary and packages it into local install targets (`AdvancedDock.dmg` and `AdvancedDock.zip`), injecting version details into the application bundle's `Info.plist`:
+    Builds the binary and packages it into local install targets (`OptTab.dmg` and `OptTab.zip`), injecting version details into the application bundle's `Info.plist`:
     ```bash
     # Usage: ./release.sh <version> <build_number>
     ./release.sh 1.6 1
@@ -135,7 +135,7 @@ AdvancedDock uses a modular, two-tier release workflow based on the GitHub CLI (
 ### Script Automation Features:
 *   **Version Injection**: Dynamically injects version and build numbers into the app bundle `Info.plist` during compilation.
 *   **Git Lifecycle**: Bumps commits, tags the commit locally, pushes to main, and force-pushes the release tag (`v$VERSION`) to ensure tag alignment.
-*   **Overwriting Existing Releases**: Uses the GitHub CLI (`gh release create --clobber`) to automatically update existing releases and overwrite the DMG/ZIP assets if they already exist, making the release cycle completely idempotent.
+*   **Overwriting Existing Releases**: Uses the GitHub CLI (`gh release upload --clobber`) to automatically update existing releases and overwrite the DMG/ZIP assets if they already exist, making the release cycle completely idempotent.
 
 ---
 

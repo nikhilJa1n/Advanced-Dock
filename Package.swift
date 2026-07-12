@@ -2,17 +2,17 @@
 import PackageDescription
 
 let package = Package(
-    name: "AdvancedDock",
+    name: "OptTab",
     platforms: [
         .macOS(.v14)
     ],
     products: [
-        .executable(name: "AdvancedDock", targets: ["AdvancedDock"])
+        .executable(name: "OptTab", targets: ["OptTab"])
     ],
     dependencies: [],
     targets: [
         .executableTarget(
-            name: "AdvancedDock",
+            name: "OptTab",
             dependencies: [],
             path: "Sources"
         )

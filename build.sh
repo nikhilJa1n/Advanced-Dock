@@ -16,8 +16,8 @@ fi
 echo "=== Building Swift Package in Release Mode ==="
 swift build -c release
 
-echo "=== Packaging into AdvancedDock.app ==="
-APP_NAME="AdvancedDock"
+echo "=== Packaging into OptTab.app ==="
+APP_NAME="OptTab"
 APP_DIR="${APP_NAME}.app"
 
 # Create directories
@@ -43,7 +43,7 @@ cat > "${APP_DIR}/Contents/Info.plist" <<EOF
     <key>CFBundleIconFile</key>
     <string>AppIcon.icns</string>
     <key>CFBundleIdentifier</key>
-    <string>com.nikhiljain.AdvancedDock</string>
+    <string>com.nikhiljain.OptTab</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
@@ -61,7 +61,7 @@ cat > "${APP_DIR}/Contents/Info.plist" <<EOF
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSAppleEventsUsageDescription</key>
-    <string>AdvancedDock needs to send Apple Events to switch between windows of applications like Google Chrome.</string>
+    <string>OptTab needs to send Apple Events to switch between windows of applications like Google Chrome.</string>
 </dict>
 </plist>
 EOF
@@ -74,7 +74,7 @@ echo "=== App Bundle created successfully at ${APP_DIR} ==="
 
 # Create DMG Installer
 echo "=== Creating DMG Installer ==="
-DMG_NAME="AdvancedDock"
+DMG_NAME="OptTab"
 DMG_FILE="${DMG_NAME}.dmg"
 
 # Remove old DMG if exists

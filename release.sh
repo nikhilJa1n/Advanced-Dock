@@ -22,30 +22,30 @@ if [[ "$REMOTE_URL" =~ github.com[:/]([^/]+)/([^.]+)(.git)? ]]; then
     REPO="${BASH_REMATCH[2]}"
 fi
 
-echo "=== Packaging AdvancedDock for Release (Version: $VERSION, Build: $BUILD_NUMBER) ==="
+echo "=== Packaging OptTab for Release (Version: $VERSION, Build: $BUILD_NUMBER) ==="
 bash build.sh "$VERSION" "$BUILD_NUMBER"
 
 # Check compile outputs
-if [ ! -d "AdvancedDock.app" ] || [ ! -f "AdvancedDock.dmg" ]; then
+if [ ! -d "OptTab.app" ] || [ ! -f "OptTab.dmg" ]; then
     echo "Error: Build artifacts not generated correctly."
     exit 1
 fi
 
 # Create ZIP archive (.zip) as fallback
-echo "=== Creating ZIP Archive (AdvancedDock.zip) ==="
-rm -f AdvancedDock.zip
-zip -r -y -q AdvancedDock.zip AdvancedDock.app
+echo "=== Creating ZIP Archive (OptTab.zip) ==="
+rm -f OptTab.zip
+zip -r -y -q OptTab.zip OptTab.app
 
 # Update update.json configuration
 echo "=== Updating update.json ==="
 cat > update.json <<EOF
 {
   "version": "$VERSION",
-  "downloadUrl": "https://github.com/$OWNER/$REPO/releases/download/v$VERSION/AdvancedDock.dmg",
+  "downloadUrl": "https://github.com/$OWNER/$REPO/releases/download/v$VERSION/OptTab.dmg",
   "changelog": "Released version $VERSION."
 }
 EOF
 
 # Summary
 echo "=== Release Packages Created Successfully ==="
-ls -lh AdvancedDock.dmg AdvancedDock.zip
+ls -lh OptTab.dmg OptTab.zip

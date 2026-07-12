@@ -40,9 +40,7 @@ git push origin -f "$TAG" || true
 
 # 5. Create release via GitHub CLI
 echo "=== Publishing Release $TAG on GitHub ==="
-gh release create "$TAG" AdvancedDock.dmg AdvancedDock.zip \
-    --title "$TAG" \
-    --generate-notes \
-    --clobber
+gh release create "$TAG" --title "$TAG" --generate-notes || true
+gh release upload "$TAG" OptTab.dmg OptTab.zip --clobber
 
 echo "=== Release $TAG published successfully! ==="

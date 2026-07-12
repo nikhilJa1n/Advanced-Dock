@@ -383,7 +383,7 @@ class WindowList {
             if !activePIDs.contains(pid) {
                 let placeholderID = UInt32(bitPattern: -Int32(pid))
                 let appName = app.localizedName ?? ""
-                if appName.isEmpty || systemApps.contains(appName) || appName == "AdvancedDock" {
+                if appName.isEmpty || systemApps.contains(appName) || appName == "OptTab" {
                     continue
                 }
                 

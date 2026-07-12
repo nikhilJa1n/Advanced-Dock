@@ -51,7 +51,7 @@ class UpdateChecker {
                 if self.isVersion(info.version, newerThan: currentVersion) {
                     self.showUpdateAvailableAlert(info: info)
                 } else if verbose {
-                    self.showAlertOnMainQueue(title: "Up to Date", message: "AdvancedDock \(currentVersion) is currently the newest version available.")
+                    self.showAlertOnMainQueue(title: "Up to Date", message: "OptTab \(currentVersion) is currently the newest version available.")
                 }
             } catch {
                 if verbose {
