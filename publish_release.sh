@@ -42,7 +42,7 @@ git push origin -f "$TAG" || true
 echo "=== Publishing Release $TAG on GitHub ==="
 gh release create "$TAG" AdvancedDock.dmg AdvancedDock.zip \
     --title "$TAG" \
-    --notes "Release of version $VERSION (Build $BUILD_NUMBER)." \
+    --generate-notes \
     --clobber
 
 echo "=== Release $TAG published successfully! ==="
