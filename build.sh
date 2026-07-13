@@ -97,3 +97,13 @@ hdiutil create -volname "${DMG_NAME}" -srcfolder "${STAGING_DIR}" -ov -format UD
 rm -rf "${STAGING_DIR}"
 
 echo "=== DMG created successfully at ${DMG_FILE} ==="
+
+# Automatically install and relaunch the app if not packaging a release
+if [ "$SKIP_RELAUNCH" != "true" ]; then
+    echo "=== Installing and Relaunching ${APP_NAME}.app ==="
+    killall "${APP_NAME}" || true
+    rm -rf "/Applications/${APP_NAME}.app"
+    cp -R "${APP_DIR}" "/Applications/"
+    open "/Applications/${APP_NAME}.app"
+    echo "=== ${APP_NAME}.app successfully installed and launched! ==="
+fi

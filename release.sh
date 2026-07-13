@@ -23,6 +23,7 @@ if [[ "$REMOTE_URL" =~ github.com[:/]([^/]+)/([^.]+)(.git)? ]]; then
 fi
 
 echo "=== Packaging OptTab for Release (Version: $VERSION, Build: $BUILD_NUMBER) ==="
+export SKIP_RELAUNCH="true"
 bash build.sh "$VERSION" "$BUILD_NUMBER"
 
 # Check compile outputs
