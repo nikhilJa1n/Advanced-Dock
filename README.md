@@ -1,4 +1,4 @@
-# <img src="screenshots/app_icon.jpg" width="48" height="48" align="center" style="border-radius:10px; margin-right:10px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" /> OptTab
+# <img src="screenshots/app_icon.png" width="48" height="48" align="center" style="border-radius:10px; margin-right:10px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" /> OptTab
 
 <p align="left">
   <a href="https://apple.com"><img src="https://img.shields.io/badge/platform-macOS%2014.0%2B-blue.svg?style=flat-square" alt="Platform" /></a>
