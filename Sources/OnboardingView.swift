@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import ServiceManagement
 
 struct RunningAppInfo: Identifiable, Hashable {
     let id = UUID()
@@ -10,6 +11,20 @@ struct RunningAppInfo: Identifiable, Hashable {
 class AppState: ObservableObject {
     @Published var isAccessibilityGranted = false
     @Published var isScreenRecordingGranted = false
+    
+    @Published var startAtLogin: Bool {
+        didSet {
+            UserDefaults.standard.set(startAtLogin, forKey: "startAtLogin")
+            updateStartAtLogin()
+        }
+    }
+    
+    @Published var hideMenuIcon: Bool {
+        didSet {
+            UserDefaults.standard.set(hideMenuIcon, forKey: "hideMenuIcon")
+            NotificationCenter.default.post(name: Notification.Name("updateStatusBarVisibility"), object: nil)
+        }
+    }
     
     @Published var isOptionKeyPressed = false
     @Published var isTabKeyPressed = false
@@ -95,6 +110,9 @@ class AppState: ObservableObject {
         
         self.useGridLayout = UserDefaults.standard.object(forKey: "useGridLayout") as? Bool ?? false
         
+        self.hideMenuIcon = UserDefaults.standard.object(forKey: "hideMenuIcon") as? Bool ?? false
+        self.startAtLogin = (SMAppService.mainApp.status == .enabled)
+        
         checkPermissions()
         startPermissionPolling()
     }
@@ -125,6 +143,33 @@ class AppState: ObservableObject {
         UserDefaults.standard.removeObject(forKey: "excludedApps")
         UserDefaults.standard.removeObject(forKey: "dockHoverDelay")
         UserDefaults.standard.removeObject(forKey: "useGridLayout")
+        
+        self.startAtLogin = false
+        self.hideMenuIcon = false
+        UserDefaults.standard.removeObject(forKey: "hideMenuIcon")
+    }
+    
+    func updateStartAtLogin() {
+        let service = SMAppService.mainApp
+        if startAtLogin {
+            if service.status != .enabled {
+                do {
+                    try service.register()
+                    print("[AppState] Registered start at login successfully.")
+                } catch {
+                    print("[AppState] Failed to register start at login: \(error.localizedDescription)")
+                }
+            }
+        } else {
+            if service.status == .enabled {
+                do {
+                    try service.unregister()
+                    print("[AppState] Unregistered start at login successfully.")
+                } catch {
+                    print("[AppState] Failed to unregister start at login: \(error.localizedDescription)")
+                }
+            }
+        }
     }
     
     func checkPermissions() {
@@ -447,6 +492,32 @@ struct GeneralTab: View {
                         description: "Arrange switcher thumbnails in a 2D multi-row grid instead of a single paginated horizontal row.",
                         isOn: $state.useGridLayout
                     )
+                }
+                
+                SettingsSection("System Integration") {
+                    ToggleRow(
+                        title: "Start at Login",
+                        description: "Launch OptTab automatically when you log in to your Mac.",
+                        isOn: $state.startAtLogin
+                    )
+                    
+                    Divider()
+                        .background(Color.white.opacity(0.04))
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        ToggleRow(
+                            title: "Hide Menu Bar Icon",
+                            description: "Hide the status bar item icon.",
+                            isOn: $state.hideMenuIcon
+                        )
+                        
+                        if state.hideMenuIcon {
+                            Text("⚠️ When hidden, reopen the Control Panel by launching the app again from your Applications folder.")
+                                .font(.system(size: 9.5))
+                                .foregroundColor(.yellow.opacity(0.85))
+                                .padding(.top, 2)
+                        }
+                    }
                 }
                 
                 SettingsSection("Switcher Scale") {

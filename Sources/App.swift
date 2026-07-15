@@ -69,6 +69,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotkeyManagerDelegate {
         // Setup Status Bar Item
         setupStatusBar()
         
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleStatusBarVisibilityChange),
+            name: Notification.Name("updateStatusBarVisibility"),
+            object: nil
+        )
+        
         // Observe accessibility grant notifications from AppState polling
         NotificationCenter.default.addObserver(
             self,
@@ -193,6 +200,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotkeyManagerDelegate {
         if appState.enableDockHoverPreviews {
             dockHoverMonitor?.start()
         }
+    }
+    
+    @objc func handleStatusBarVisibilityChange() {
+        setupStatusBar()
+    }
+    
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        showOnboarding()
+        return true
     }
     
     
@@ -357,19 +373,28 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotkeyManagerDelegate {
     }
     
     func setupStatusBar() {
-        statusBarItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        if let button = statusBarItem?.button {
-            button.image = NSImage(systemSymbolName: "square.filled.on.square", accessibilityDescription: "Advanced Switcher")
-            // Optional: Support dark/light mode for template images
-            button.image?.isTemplate = true
+        if appState.hideMenuIcon {
+            if let item = statusBarItem {
+                NSStatusBar.system.removeStatusItem(item)
+                statusBarItem = nil
+            }
+            return
         }
         
-        let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "Control Panel...", action: #selector(showOnboarding), keyEquivalent: "o"))
-        menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: "Quit Advanced Switcher", action: #selector(quitApp), keyEquivalent: "q"))
-        
-        statusBarItem?.menu = menu
+        if statusBarItem == nil {
+            statusBarItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+            if let button = statusBarItem?.button {
+                button.image = NSImage(systemSymbolName: "square.filled.on.square", accessibilityDescription: "Advanced Switcher")
+                button.image?.isTemplate = true
+            }
+            
+            let menu = NSMenu()
+            menu.addItem(NSMenuItem(title: "Control Panel...", action: #selector(showOnboarding), keyEquivalent: "o"))
+            menu.addItem(NSMenuItem.separator())
+            menu.addItem(NSMenuItem(title: "Quit Advanced Switcher", action: #selector(quitApp), keyEquivalent: "q"))
+            
+            statusBarItem?.menu = menu
+        }
     }
     
     @objc func showOnboarding() {
