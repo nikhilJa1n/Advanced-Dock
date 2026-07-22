@@ -14,9 +14,14 @@ class UpdateChecker {
     private let updateURLString = "https://raw.githubusercontent.com/nikhilJa1n/OptTab-MAC/main/update.json"
     
     func checkForUpdates(verbose: Bool = false) {
-        guard let url = URL(string: updateURLString) else { return }
+        guard var components = URLComponents(string: updateURLString) else { return }
+        components.queryItems = [URLQueryItem(name: "t", value: "\(Int(Date().timeIntervalSince1970))")]
+        guard let url = components.url else { return }
         
-        let task = URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: 15)
+        request.httpMethod = "GET"
+        
+        let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             guard let self = self else { return }
             
             if let error = error {
