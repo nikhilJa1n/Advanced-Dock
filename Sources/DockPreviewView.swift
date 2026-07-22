@@ -91,12 +91,13 @@ struct DockPreviewCard: View {
             ZStack {
                 // Thumbnail container
                 ZStack {
+                    Color.black.opacity(0.35)
+                    
                     if let img = thumbnail {
                         Image(nsImage: img)
                             .resizable()
-                            .aspectRatio(contentMode: .fill)
+                            .aspectRatio(contentMode: .fit)
                             .frame(width: cardWidth, height: cardHeight)
-                            .clipped()
                     } else {
                         // Fallback background with beautiful dark gradient
                         LinearGradient(
@@ -190,12 +191,16 @@ struct DockPreviewCard: View {
     }
     
     private func loadThumbnail() {
+        let targetWindow = window
+        let targetID = window.id
         DispatchQueue.global(qos: .userInteractive).async {
-            if let cgImage = WindowList.getThumbnail(for: window.id) {
+            if let cgImage = WindowList.getThumbnail(for: targetWindow) {
                 let size = NSSize(width: cgImage.width, height: cgImage.height)
                 let nsImage = NSImage(cgImage: cgImage, size: size)
                 DispatchQueue.main.async {
-                    self.thumbnail = nsImage
+                    if self.window.id == targetID {
+                        self.thumbnail = nsImage
+                    }
                 }
             }
         }

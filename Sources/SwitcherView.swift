@@ -179,7 +179,7 @@ struct SwitcherView: View {
                                         onClick: { onClickIndex(cardIndex) },
                                         appState: appState
                                     )
-                                    .id(cardIndex)
+                                    .id("\(cardIndex)_\(window.id)")
                                 }
                                 
                                 if (end - start) < cols {
@@ -206,8 +206,8 @@ struct SwitcherView: View {
                                 withAnimation(.spring(response: 0.2, dampingFraction: 0.85)) {
                                     if newIndex < maxVisibleItems {
                                         proxy.scrollTo("GRID_TOP", anchor: .top)
-                                    } else {
-                                        proxy.scrollTo(newIndex, anchor: .bottom)
+                                    } else if newIndex < windows.count {
+                                        proxy.scrollTo("\(newIndex)_\(windows[newIndex].id)", anchor: .bottom)
                                     }
                                 }
                             }
@@ -215,8 +215,8 @@ struct SwitcherView: View {
                                 let maxVisibleItems = cols * Int(maxAllowedRows)
                                 if currentIndex < maxVisibleItems {
                                     proxy.scrollTo("GRID_TOP", anchor: .top)
-                                } else {
-                                    proxy.scrollTo(currentIndex, anchor: .bottom)
+                                } else if currentIndex < windows.count {
+                                    proxy.scrollTo("\(currentIndex)_\(windows[currentIndex].id)", anchor: .bottom)
                                 }
                             }
                         }
@@ -393,12 +393,16 @@ struct WindowCard: View {
     }
     
     private func loadThumbnail() {
+        let targetWindow = window
+        let targetID = window.id
         DispatchQueue.global(qos: .userInteractive).async {
-            if let cgImage = WindowList.getThumbnail(for: window.id) {
+            if let cgImage = WindowList.getThumbnail(for: targetWindow) {
                 let size = NSSize(width: cgImage.width, height: cgImage.height)
                 let nsImage = NSImage(cgImage: cgImage, size: size)
                 DispatchQueue.main.async {
-                    self.thumbnail = nsImage
+                    if self.window.id == targetID {
+                        self.thumbnail = nsImage
+                    }
                 }
             }
         }
@@ -447,12 +451,13 @@ struct CardThumbnailView: View {
         let cardHeight = 106.0 * scale
         
         ZStack {
+            Color.black.opacity(0.35)
+            
             if let thumb = thumbnail {
                 Image(nsImage: thumb)
                     .resizable()
-                    .aspectRatio(contentMode: .fill)
+                    .aspectRatio(contentMode: .fit)
                     .frame(width: CGFloat(cardWidth), height: CGFloat(cardHeight))
-                    .clipped()
             } else {
                 // Sleek fallback visual with dark metallic gradient & centered app icon
                 ZStack {

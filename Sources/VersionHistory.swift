@@ -17,8 +17,10 @@ public struct VersionHistory {
             version: "3.0",
             releaseDate: "July 2026",
             isCurrent: true,
-            summary: "Add grid layout configuration and dynamic column handling in SwitcherView",
+            summary: "Enhance thumbnail loading and display in DockPreviewView and SwitcherView with improved caching and UI adjustments",
             features: [
+                "Enhance thumbnail loading and display in DockPreviewView and SwitcherView with improved caching and UI adjustments",
+                "Remove all GitHub Actions workflows",
                 "Add grid layout configuration and dynamic column handling in SwitcherView",
                 "Add version history feature with detailed release notes and update scripts for automation",
                 "Add app icon caching and improve window image capture logic"
@@ -27,7 +29,7 @@ public struct VersionHistory {
                 
             ]
         ),
-                                                                                VersionRelease(
+                                                                                                VersionRelease(
             version: "2.7",
             releaseDate: "July 2026",
             isCurrent: false,

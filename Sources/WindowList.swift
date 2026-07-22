@@ -127,6 +127,7 @@ class WindowList {
         cacheLock.unlock()
     }
     static func getWindows(showAllSpacesOverride: Bool? = nil, showMinimizedOverride: Bool? = nil) -> [WindowInfo] {
+        prefetchShareableContent()
         let systemApps = ["Dock", "SystemUIServer", "WindowServer", "NotificationCenter", "ControlCenter", "Wallpaper", "Siri", "Spotlight", "TextInputMenuAgent", "TextInputSwitcher"]
         
         // Gather onscreen Z-order rank from active space to sort raw lists in MRU order
@@ -502,49 +503,107 @@ class WindowList {
         return false
     }
     
-    static func getThumbnail(for windowID: CGWindowID) -> CGImage? {
+    private static var cachedShareableContent: SCShareableContent? = nil
+    private static var lastContentFetchTime: Date = .distantPast
+    private static let contentLock = NSLock()
+
+    static func prefetchShareableContent() {
+        SCShareableContent.getExcludingDesktopWindows(false, onScreenWindowsOnly: false) { content, _ in
+            contentLock.lock()
+            if let content = content {
+                cachedShareableContent = content
+                lastContentFetchTime = Date()
+            }
+            contentLock.unlock()
+        }
+    }
+
+    static func getThumbnail(for window: WindowInfo) -> CGImage? {
+        let windowID = window.id
         if Int32(bitPattern: windowID) < 0 {
             return nil
         }
         
         cacheLock.lock()
-        if let cached = thumbnailCache[windowID], Date().timeIntervalSince(cached.timestamp) < 3.0 {
+        if let cached = thumbnailCache[windowID], Date().timeIntervalSince(cached.timestamp) < 10.0 {
             cacheLock.unlock()
             return cached.image
         }
         cacheLock.unlock()
         
-        // Fast Path 1: Instant CGWindowListCreateImage snapshot (~1ms)
-        var capturedImage: CGImage? = CGWindowListCreateImage(
-            .null,
-            .optionIncludingWindow,
-            windowID,
-            [.boundsIgnoreFraming, .bestResolution]
-        )
+        // Retrieve or fetch SCShareableContent
+        contentLock.lock()
+        var content = cachedShareableContent
+        let fetchAge = Date().timeIntervalSince(lastContentFetchTime)
+        contentLock.unlock()
         
-        // Slow Path 2: If CGWindowList image is nil (e.g. offscreen/other space window), fallback to ScreenCaptureKit
-        if capturedImage == nil {
-            let semFast = DispatchSemaphore(value: 0)
-            SCShareableContent.getExcludingDesktopWindows(false, onScreenWindowsOnly: true) { content, error in
-                guard let content = content, error == nil,
-                      let scWindow = content.windows.first(where: { $0.windowID == windowID }) else {
-                    semFast.signal()
-                    return
+        if content == nil || fetchAge > 5.0 {
+            let sem = DispatchSemaphore(value: 0)
+            SCShareableContent.getExcludingDesktopWindows(false, onScreenWindowsOnly: false) { freshContent, error in
+                if let freshContent = freshContent {
+                    self.contentLock.lock()
+                    self.cachedShareableContent = freshContent
+                    self.lastContentFetchTime = Date()
+                    self.contentLock.unlock()
+                    content = freshContent
                 }
-                
-                let filter = SCContentFilter(desktopIndependentWindow: scWindow)
-                let config = SCStreamConfiguration()
-                config.showsCursor = false
-                config.width = 340
-                config.height = 212
-                
-                SCScreenshotManager.captureImage(contentFilter: filter, configuration: config) { image, err in
-                    capturedImage = image
-                    semFast.signal()
-                }
+                sem.signal()
             }
-            _ = semFast.wait(timeout: .now() + 0.15)
+            _ = sem.wait(timeout: .now() + 0.4)
         }
+        
+        guard let shareableContent = content else {
+            return nil
+        }
+        
+        let targetPID = window.pid
+        let targetTitle = window.title
+        let targetBounds = window.bounds
+        
+        let appSCWindows = shareableContent.windows.filter { $0.owningApplication?.processID == targetPID }
+        
+        // Tier 1: Direct 1-to-1 Window ID match from macOS WindowServer
+        var targetSCWindow = appSCWindows.first(where: { $0.windowID == windowID })
+        
+        // Tier 2: Match by exact or matching Title
+        if targetSCWindow == nil && !targetTitle.isEmpty {
+            targetSCWindow = appSCWindows.first(where: { scW in
+                let scTitle = scW.title ?? ""
+                return !scTitle.isEmpty && (scTitle == targetTitle || scTitle.contains(targetTitle) || targetTitle.contains(scTitle))
+            })
+        }
+        
+        // Tier 3: Match by similar frame bounds
+        if targetSCWindow == nil {
+            targetSCWindow = appSCWindows.first(where: { scW in
+                abs(scW.frame.origin.x - targetBounds.origin.x) < 20 &&
+                abs(scW.frame.origin.y - targetBounds.origin.y) < 20 &&
+                abs(scW.frame.width - targetBounds.width) < 30 &&
+                abs(scW.frame.height - targetBounds.height) < 30
+            })
+        }
+        
+        guard let scWindow = targetSCWindow else {
+            logMessage("[Thumbnail] No matching SCWindow found for '\(window.ownerName):\(window.title)' (id=\(windowID))")
+            return nil
+        }
+        logMessage("[Thumbnail] Matched SCWindow ID: \(scWindow.windowID) | Title: '\(scWindow.title ?? "")' for window '\(window.ownerName):\(window.title)' (id=\(windowID))")
+        
+        var capturedImage: CGImage? = nil
+        let semCap = DispatchSemaphore(value: 0)
+        let filter = SCContentFilter(desktopIndependentWindow: scWindow)
+        let config = SCStreamConfiguration()
+        config.showsCursor = false
+        let w = Int(scWindow.frame.width * 0.4)
+        let h = Int(scWindow.frame.height * 0.4)
+        config.width = w > 0 ? w : 340
+        config.height = h > 0 ? h : 212
+        
+        SCScreenshotManager.captureImage(contentFilter: filter, configuration: config) { image, err in
+            capturedImage = image
+            semCap.signal()
+        }
+        _ = semCap.wait(timeout: .now() + 0.3)
         
         if let img = capturedImage {
             cacheLock.lock()
