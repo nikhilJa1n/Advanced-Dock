@@ -376,36 +376,32 @@ class WindowList {
         var seenBoundsForPID = [pid_t: Set<String>]()
         
         if groupTabbedWindows {
-            // Deduplicate non-AX-valid windows that have nearly identical bounds to an already-kept window.
-            // AX-valid windows are always kept — they are real, user-facing windows (e.g., 3 separate
-            // maximized Chrome windows). Non-AX-valid windows with matching bounds are tab/helper
-            // duplicates that macOS reports separately in CGWindowList but share the same frame.
-            // We use a tolerance of 20px to handle sub-pixel/retina differences.
             let tolerance: CGFloat = 20.0
             var seenBoundsListForPID = [pid_t: [CGRect]]()
             
             for window in windows {
-                // Always keep AX-valid windows — they are real, separate windows
                 if window.isAXValid {
-                    seenBoundsListForPID[window.pid, default: []].append(window.bounds)
-                    uniqueWindows.append(window)
-                    continue
-                }
-                
-                // For non-AX-valid windows, check if they duplicate an existing window's bounds
-                let dominated = seenBoundsListForPID[window.pid, default: []].contains { existingRect in
-                    let dX = abs(existingRect.origin.x - window.bounds.origin.x)
-                    let dY = abs(existingRect.origin.y - window.bounds.origin.y)
-                    let dW = abs(existingRect.width - window.bounds.width)
-                    let dH = abs(existingRect.height - window.bounds.height)
-                    return dX <= tolerance && dY <= tolerance && dW <= tolerance && dH <= tolerance
-                }
-                
-                if !dominated {
+                    // Real top-level OS window: always keep as a separate card,
+                    // and record its bounds to deduplicate non-AX tab entries belonging to this window.
                     seenBoundsListForPID[window.pid, default: []].append(window.bounds)
                     uniqueWindows.append(window)
                 } else {
-                    logMessage("[TabDedup] Filtered duplicate: '\(window.title)' pid=\(window.pid) bounds=\(window.bounds)")
+                    // Non-AX window (tab duplicate, helper layer, or background overlay):
+                    // Only keep if its bounds do NOT match any already-kept window of the same PID (within 20px tolerance).
+                    let matchesExisting = seenBoundsListForPID[window.pid, default: []].contains { existingRect in
+                        let dX = abs(existingRect.origin.x - window.bounds.origin.x)
+                        let dY = abs(existingRect.origin.y - window.bounds.origin.y)
+                        let dW = abs(existingRect.width - window.bounds.width)
+                        let dH = abs(existingRect.height - window.bounds.height)
+                        return dX <= tolerance && dY <= tolerance && dW <= tolerance && dH <= tolerance
+                    }
+                    
+                    if !matchesExisting {
+                        seenBoundsListForPID[window.pid, default: []].append(window.bounds)
+                        uniqueWindows.append(window)
+                    } else {
+                        logMessage("[TabDedup] Filtered non-AX tab duplicate: '\(window.title)' (\(window.ownerName)) pid=\(window.pid) bounds=\(window.bounds)")
+                    }
                 }
             }
         } else {
@@ -595,6 +591,24 @@ class WindowList {
         
         let appRef = AXUIElementCreateApplication(window.pid)
         
+        func performAXRaise(axWindow: AXUIElement) {
+            var minimizedValue: AnyObject?
+            if AXUIElementCopyAttributeValue(axWindow, kAXMinimizedAttribute as CFString, &minimizedValue) == .success,
+               let isMin = minimizedValue as? Bool, isMin {
+                AXUIElementSetAttributeValue(axWindow, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
+            }
+            
+            AXUIElementSetAttributeValue(appRef, kAXMainWindowAttribute as CFString, axWindow)
+            AXUIElementSetAttributeValue(appRef, kAXFocusedWindowAttribute as CFString, axWindow)
+            AXUIElementSetAttributeValue(axWindow, kAXMainAttribute as CFString, kCFBooleanTrue)
+            AXUIElementSetAttributeValue(axWindow, kAXFocusedAttribute as CFString, kCFBooleanTrue)
+            AXUIElementPerformAction(axWindow, kAXRaiseAction as CFString)
+            
+            // Activate app AFTER updating AX attributes so macOS brings the selected window forward
+            app.activate(options: [.activateIgnoringOtherApps])
+            AXUIElementPerformAction(axWindow, kAXRaiseAction as CFString)
+        }
+        
         @discardableResult
         func tryRaise() -> Bool {
             var axElements: [AXUIElement] = []
@@ -636,20 +650,7 @@ class WindowList {
                 
                 if let id = id, id == window.id {
                     logMessage("      Match found by WindowID! Raising window.")
-                    // If minimized, unminimize first
-                    var minimizedValue: AnyObject?
-                    if AXUIElementCopyAttributeValue(axWindow, kAXMinimizedAttribute as CFString, &minimizedValue) == .success,
-                       let isMin = minimizedValue as? Bool, isMin {
-                        AXUIElementSetAttributeValue(axWindow, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
-                    }
-                    
-                    // Set as main and focused window for cross-space switching
-                    AXUIElementSetAttributeValue(appRef, kAXMainWindowAttribute as CFString, axWindow)
-                    AXUIElementSetAttributeValue(appRef, kAXFocusedWindowAttribute as CFString, axWindow)
-                    AXUIElementSetAttributeValue(axWindow, kAXMainAttribute as CFString, kCFBooleanTrue)
-                    AXUIElementSetAttributeValue(axWindow, kAXFocusedAttribute as CFString, kCFBooleanTrue)
-                    
-                    AXUIElementPerformAction(axWindow, kAXRaiseAction as CFString)
+                    performAXRaise(axWindow: axWindow)
                     return true
                 }
             }
@@ -662,11 +663,7 @@ class WindowList {
                 
                 if !axTitle.isEmpty && titlesMatch(axTitle: axTitle, windowTitle: window.title) {
                     logMessage("      Match found by title Fallback! '\(axTitle)' vs '\(window.title)'. Raising.")
-                    AXUIElementSetAttributeValue(appRef, kAXMainWindowAttribute as CFString, axWindow)
-                    AXUIElementSetAttributeValue(appRef, kAXFocusedWindowAttribute as CFString, axWindow)
-                    AXUIElementSetAttributeValue(axWindow, kAXMainAttribute as CFString, kCFBooleanTrue)
-                    AXUIElementSetAttributeValue(axWindow, kAXFocusedAttribute as CFString, kCFBooleanTrue)
-                    AXUIElementPerformAction(axWindow, kAXRaiseAction as CFString)
+                    performAXRaise(axWindow: axWindow)
                     return true
                 }
             }
@@ -675,124 +672,108 @@ class WindowList {
             for axWindow in axWindows {
                 if selectTabIfNeeded(element: axWindow, targetTitle: window.title) {
                     logMessage("      Match found by tab fallback! Raising.")
-                    var minimizedValue: AnyObject?
-                    if AXUIElementCopyAttributeValue(axWindow, kAXMinimizedAttribute as CFString, &minimizedValue) == .success,
-                       let isMin = minimizedValue as? Bool, isMin {
-                        AXUIElementSetAttributeValue(axWindow, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
-                    }
-                    
-                    AXUIElementSetAttributeValue(appRef, kAXMainWindowAttribute as CFString, axWindow)
-                    AXUIElementSetAttributeValue(appRef, kAXFocusedWindowAttribute as CFString, axWindow)
-                    AXUIElementSetAttributeValue(axWindow, kAXMainAttribute as CFString, kCFBooleanTrue)
-                    AXUIElementSetAttributeValue(axWindow, kAXFocusedAttribute as CFString, kCFBooleanTrue)
-                    AXUIElementPerformAction(axWindow, kAXRaiseAction as CFString)
+                    performAXRaise(axWindow: axWindow)
                     return true
                 }
             }
-            
-            // Fallback 3: Raise the first window of the application to prevent silent failure
-            // Skip for Chromium apps — Chrome's AX tree doesn't expose all windows,
-            // so raising the first AX window would bring up the WRONG window.
-            // Instead, return false to let the AppleScript fallback handle it.
-            let chromiumApps = ["Google Chrome", "Google Chrome Canary", "Chromium", "Microsoft Edge", "Brave Browser", "Arc", "Vivaldi", "Opera"]
-            let isChromiumApp = chromiumApps.contains(window.ownerName)
-            
-            if !isChromiumApp, let firstWindow = axWindows.first {
-                var titleValue: AnyObject?
-                AXUIElementCopyAttributeValue(firstWindow, kAXTitleAttribute as CFString, &titleValue)
-                let firstTitle = titleValue as? String ?? ""
-                logMessage("      Fallback 3: Raising first window of app (Title: \(firstTitle))")
-                var minimizedValue: AnyObject?
-                if AXUIElementCopyAttributeValue(firstWindow, kAXMinimizedAttribute as CFString, &minimizedValue) == .success,
-                   let isMin = minimizedValue as? Bool, isMin {
-                    AXUIElementSetAttributeValue(firstWindow, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
-                }
-                
-                AXUIElementSetAttributeValue(appRef, kAXMainWindowAttribute as CFString, firstWindow)
-                AXUIElementSetAttributeValue(appRef, kAXFocusedWindowAttribute as CFString, firstWindow)
-                AXUIElementSetAttributeValue(firstWindow, kAXMainAttribute as CFString, kCFBooleanTrue)
-                AXUIElementSetAttributeValue(firstWindow, kAXFocusedAttribute as CFString, kCFBooleanTrue)
-                AXUIElementPerformAction(firstWindow, kAXRaiseAction as CFString)
-                return true
-            }
-            
-            if isChromiumApp {
-                logMessage("      tryRaise: Chromium app — skipping Fallback 3, deferring to AppleScript.")
-            }
-            
-            logMessage("      tryRaise: No match found.")
+            logMessage("      tryRaise: No match found by AX ID/Title.")
             return false
         }
         
         // AppleScript fallback for applications when standard AX activation fails.
-        // For Chromium apps, searches and brings the target window forward by title.
-        // For standard apps (like Notes, Finder, etc.), sends a reopen and activate event to unminimize/raise its windows.
+        // Multi-tier AppleScript fallback for applications when standard AX activation fails.
+        // Tiers: 1. AppleScript Window ID -> 2. Title Fragments -> 3. Window Position (Screen Coordinates)
         func tryAppleScriptRaise() -> Bool {
-            let chromiumApps = ["Google Chrome", "Google Chrome Canary", "Chromium", "Microsoft Edge", "Brave Browser", "Arc", "Vivaldi", "Opera"]
-            
-            let script: String
+            let targetTitle = window.title
             let appScriptName = window.ownerName
+            let targetID = window.id
+            let targetX = Int(window.bounds.origin.x)
+            let targetY = Int(window.bounds.origin.y)
             
-            if chromiumApps.contains(appScriptName) {
-                // Chromium specific title-based activation
-                let targetTitle = window.title
-                let resolvedScriptName: String
-                switch appScriptName {
-                case "Google Chrome Canary": resolvedScriptName = "Google Chrome Canary"
-                case "Microsoft Edge": resolvedScriptName = "Microsoft Edge"
-                case "Brave Browser": resolvedScriptName = "Brave Browser"
-                default: resolvedScriptName = appScriptName
-                }
-                
-                var titleFragments: [String] = []
-                if targetTitle.contains("…") {
-                    titleFragments = targetTitle.components(separatedBy: "…")
-                        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                        .filter { !$0.isEmpty }
-                } else {
-                    titleFragments = [targetTitle]
-                }
-                
-                var conditions: [String] = []
-                for fragment in titleFragments {
-                    let escaped = fragment.replacingOccurrences(of: "\\", with: "\\\\")
-                        .replacingOccurrences(of: "\"", with: "\\\"")
-                    conditions.append("winTitle contains \"\(escaped)\"")
-                }
-                let conditionStr = conditions.joined(separator: " and ")
-                
-                script = """
-                tell application "\(resolvedScriptName)"
-                    set winCount to count of windows
-                    repeat with i from 1 to winCount
-                        set winTitle to title of window i
-                        if \(conditionStr) then
-                            set index of window i to 1
-                            return "ok"
-                        end if
-                    end repeat
-                    return "not_found"
-                end tell
-                """
-                logMessage("      AppleScript fallback: Running Chromium title script for '\(resolvedScriptName)'")
+            var titleFragments: [String] = []
+            if targetTitle.contains("…") {
+                titleFragments = targetTitle.components(separatedBy: "…")
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
             } else {
-                // General App fallback (e.g. Notes, Finder, Mail)
-                script = """
-                tell application "\(appScriptName)"
+                titleFragments = [targetTitle]
+            }
+            
+            var conditions: [String] = []
+            for fragment in titleFragments {
+                let escaped = fragment.replacingOccurrences(of: "\\", with: "\\\\")
+                    .replacingOccurrences(of: "\"", with: "\\\"")
+                conditions.append("winTitle contains \"\(escaped)\"")
+            }
+            let conditionStr = conditions.isEmpty ? "false" : conditions.joined(separator: " and ")
+            
+            let script = """
+            tell application "\(appScriptName)"
+                -- Tier 1: Match by AppleScript Window ID
+                try
+                    repeat with w in (get windows)
+                        try
+                            if (id of w as integer) is equal to \(targetID) then
+                                set index of w to 1
+                                activate
+                                return "ok_id"
+                            end if
+                        end try
+                    end repeat
+                end try
+                
+                -- Tier 2: Match by Title Fragment
+                try
+                    repeat with w in (get windows)
+                        try
+                            set winTitle to name of w
+                            if \(conditionStr) then
+                                set index of w to 1
+                                activate
+                                return "ok_title"
+                            end if
+                        end try
+                    end repeat
+                end try
+                
+                -- Tier 3: Match by Window Position (Screen Coordinates)
+                try
+                    repeat with w in (get windows)
+                        try
+                            set b to bounds of w
+                            set wX to item 1 of b
+                            set wY to item 2 of b
+                            set dX to wX - \(targetX)
+                            if dX < 0 then set dX to -dX
+                            set dY to wY - \(targetY)
+                            if dY < 0 then set dY to -dY
+                            if dX < 50 and dY < 50 then
+                                set index of w to 1
+                                activate
+                                return "ok_bounds"
+                            end if
+                        end try
+                    end repeat
+                end try
+                
+                -- Fallback Tier 4: Generic activate
+                try
                     reopen
                     activate
-                    return "ok"
-                end tell
-                """
-                logMessage("      AppleScript fallback: Running generic reopen/activate script for '\(appScriptName)'")
-            }
+                    return "ok_fallback"
+                end try
+                return "not_found"
+            end tell
+            """
+            
+            logMessage("      AppleScript fallback: Running multi-tier script for '\(appScriptName)' (targetID=\(targetID) title='\(targetTitle)' pos=(\(targetX),\(targetY)))")
             
             if let appleScript = NSAppleScript(source: script) {
                 var errorInfo: NSDictionary?
                 let result = appleScript.executeAndReturnError(&errorInfo)
                 let resultStr = result.stringValue ?? "nil"
                 logMessage("      AppleScript result: \(resultStr)")
-                if resultStr == "ok" {
+                if resultStr.hasPrefix("ok") {
                     return true
                 }
                 if let err = errorInfo {
