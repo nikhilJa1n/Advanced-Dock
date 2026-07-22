@@ -317,6 +317,20 @@ class WindowList {
                 continue
             }
             
+            // Filter out small popup/dialog windows that are not in the AX tree.
+            // These are typically nag popups (e.g. "This is an unregistered copy"), preference dialogs,
+            // tooltips, or helper overlays that shouldn't appear as main window cards.
+            // We keep them only if they occupy at least 15% of the screen area.
+            if !isAXValid && isOnscreen {
+                let screenFrame = NSScreen.main?.frame ?? CGRect(x: 0, y: 0, width: 1440, height: 900)
+                let windowArea = bounds.width * bounds.height
+                let screenArea = screenFrame.width * screenFrame.height
+                if windowArea < screenArea * 0.15 {
+                    logMessage("[WindowFilter] Skipping small non-AX popup: '\(title)' (\(ownerName)) bounds=\(bounds) area_ratio=\(String(format: "%.2f", windowArea/screenArea))")
+                    continue
+                }
+            }
+            
             // Space / minimized filter checks
             if !isOnscreen {
                 let minimized = axMinimizedStates[windowID] ?? false
@@ -362,13 +376,29 @@ class WindowList {
         var seenBoundsForPID = [pid_t: Set<String>]()
         
         if groupTabbedWindows {
-            // Deduplicate all windows (both AX-valid and non-AX-valid) of the same app that have the exact same bounds.
-            // Since the source window list is in front-to-back Z-order, the first one encountered is the active/visible tab.
+            // Deduplicate windows of the same app that significantly overlap (>85% overlap area).
+            // macOS tabs share the same window frame but may report slightly different bounds due to
+            // sub-pixel rendering, retina scaling, or timing differences in CGWindowList queries.
+            // Using overlap detection instead of exact bounds matching handles these edge cases.
+            var seenBoundsListForPID = [pid_t: [CGRect]]()
+            
             for window in windows {
-                let boundsKey = "\(Int(window.bounds.origin.x))-\(Int(window.bounds.origin.y))-\(Int(window.bounds.size.width))-\(Int(window.bounds.size.height))"
-                if !seenBoundsForPID[window.pid, default: []].contains(boundsKey) {
-                    seenBoundsForPID[window.pid, default: []].insert(boundsKey)
+                let dominated = seenBoundsListForPID[window.pid, default: []].contains { existingRect in
+                    let intersection = existingRect.intersection(window.bounds)
+                    guard !intersection.isNull else { return false }
+                    let intersectionArea = intersection.width * intersection.height
+                    let windowArea = window.bounds.width * window.bounds.height
+                    let existingArea = existingRect.width * existingRect.height
+                    guard windowArea > 0, existingArea > 0 else { return false }
+                    // Consider them the same tab/window if overlap exceeds 85% of either window
+                    return intersectionArea / windowArea > 0.85 || intersectionArea / existingArea > 0.85
+                }
+                
+                if !dominated {
+                    seenBoundsListForPID[window.pid, default: []].append(window.bounds)
                     uniqueWindows.append(window)
+                } else {
+                    logMessage("[TabDedup] Filtered duplicate: '\(window.title)' pid=\(window.pid) bounds=\(window.bounds)")
                 }
             }
         } else {
