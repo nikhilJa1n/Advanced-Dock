@@ -41,8 +41,33 @@ struct SwitcherView: View {
     let onHoverIndex: (Int) -> Void
     let onClickIndex: (Int) -> Void
     
+    // Dynamic column layout based on user preference or responsive window count
     var gridCols: Int {
-        return min(windows.count, 5) > 0 ? min(windows.count, 5) : 5
+        let count = windows.count
+        if !appState.useGridLayout {
+            return min(max(1, count), 5)
+        }
+        if appState.gridColumns > 0 {
+            return max(1, appState.gridColumns)
+        }
+        if count <= 4 { return max(1, count) }
+        if count <= 8 { return 4 }
+        if count <= 15 { return 5 }
+        return 6
+    }
+    
+    // Respect the user's thumbnail scale setting
+    var effectiveScale: Double {
+        // If user configured custom grid columns or max rows, respect thumbnail scale 100%
+        if appState.gridColumns > 0 || appState.gridMaxRows > 0 {
+            return scale
+        }
+        let count = windows.count
+        if appState.useGridLayout {
+            if count > 18 { return scale * 0.88 }
+            if count > 12 { return scale * 0.94 }
+        }
+        return scale
     }
     
     var pageSize: Int {
@@ -69,24 +94,33 @@ struct SwitcherView: View {
     }
     
     var body: some View {
-        let cardWidth = 170.0 * scale
-        let spacing = 20.0 * scale
+        let currentScale = effectiveScale
+        let cardWidth = 170.0 * currentScale
+        let spacing = 16.0 * currentScale
         
-        let cols = appState.useGridLayout ? (min(windows.count, 4) > 0 ? min(windows.count, 4) : 4) : gridCols
-        let rows = appState.useGridLayout ? max(1, Int(ceil(Double(windows.count) / Double(cols)))) : 1
+        let cols = gridCols
+        let totalRows = max(1, Int(ceil(Double(windows.count) / Double(cols))))
+        
+        // Full height of a card = thumbnail (106) + gap (8) + title (~18) + selection padding (~12)
+        let cardTotalHeight = 144.0 * currentScale
+        let totalGridHeight = appState.useGridLayout ? (cardTotalHeight * Double(totalRows) + spacing * Double(totalRows - 1)) : cardTotalHeight
+        
+        // Cap max grid height to user-configured gridMaxRows or max 4 rows
+        let maxAllowedRows = (appState.useGridLayout && appState.gridMaxRows > 0) ? Double(appState.gridMaxRows) : 4.0
+        let maxGridHeight = cardTotalHeight * maxAllowedRows + spacing * (maxAllowedRows - 1)
+        
+        let isScrollable = appState.useGridLayout && (totalRows > Int(maxAllowedRows))
+        let displayGridHeight = isScrollable ? maxGridHeight : totalGridHeight
         
         let totalCardsWidth = cardWidth * Double(cols)
         let totalSpacingWidth = spacing * Double(cols - 1)
         let contentWidth = totalCardsWidth + totalSpacingWidth
         
-        let cardTotalHeight = 132.0 * scale // 106 height + 10 spacing + 16 text
-        let gridHeight = appState.useGridLayout ? (cardTotalHeight * Double(rows) + spacing * Double(rows - 1)) : cardTotalHeight
-        
         VStack(spacing: 16) {
             // Selected Window Title Banner
             if currentIndex >= 0 && currentIndex < windows.count {
                 let currentWindow = windows[currentIndex]
-                VStack(spacing: 6) {
+                VStack(spacing: 4) {
                     HStack(spacing: 8) {
                         if let icon = currentWindow.appIcon {
                             Image(nsImage: icon)
@@ -100,32 +134,36 @@ struct SwitcherView: View {
                     }
                     
                     Text(currentWindow.title)
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
                         .foregroundColor(.white)
                         .lineLimit(1)
                         .padding(.horizontal, 24)
                 }
-                .frame(height: 48)
+                .frame(height: 40)
                 .transition(.opacity)
             } else {
                 VStack(spacing: 4) {
                     Text("No Active Windows")
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
                     
                     Text("Open windows will appear here")
                         .font(.system(size: 12, weight: .medium, design: .rounded))
                         .foregroundColor(.white.opacity(0.6))
                 }
-                .frame(height: 44)
+                .frame(height: 40)
             }
             
             // Container Box (Grid or Paginated Horizontal Row)
-            VStack(spacing: 12) {
+            VStack(spacing: 10) {
                 if appState.useGridLayout {
                     // 2D Grid Layout
-                    VStack(spacing: CGFloat(spacing)) {
-                        ForEach(0..<rows, id: \.self) { rowIndex in
+                    let gridContent = VStack(spacing: CGFloat(spacing)) {
+                        Color.clear
+                            .frame(height: 1)
+                            .id("GRID_TOP")
+                        
+                        ForEach(0..<totalRows, id: \.self) { rowIndex in
                             HStack(spacing: CGFloat(spacing)) {
                                 let start = rowIndex * cols
                                 let end = min(start + cols, windows.count)
@@ -135,13 +173,13 @@ struct SwitcherView: View {
                                     WindowCard(
                                         window: window,
                                         isSelected: cardIndex == currentIndex,
-                                        scale: scale,
+                                        scale: currentScale,
                                         refreshToken: refreshToken,
                                         onHover: { onHoverIndex(cardIndex) },
                                         onClick: { onClickIndex(cardIndex) },
                                         appState: appState
                                     )
-                                    .id(window.id)
+                                    .id(cardIndex)
                                 }
                                 
                                 if (end - start) < cols {
@@ -153,11 +191,41 @@ struct SwitcherView: View {
                             }
                         }
                     }
-                    .frame(height: CGFloat(gridHeight + 15), alignment: .center)
                     
-                    // No dots page indicator needed in grid layout
-                    Color.clear
-                        .frame(height: 10)
+                    if isScrollable {
+                        ScrollViewReader { proxy in
+                            ScrollView(.vertical, showsIndicators: true) {
+                                gridContent
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 12)
+                            }
+                            .frame(width: CGFloat(contentWidth + 28), height: CGFloat(displayGridHeight + 24))
+                            .clipped()
+                            .onChange(of: currentIndex) { newIndex in
+                                let maxVisibleItems = cols * Int(maxAllowedRows)
+                                withAnimation(.spring(response: 0.2, dampingFraction: 0.85)) {
+                                    if newIndex < maxVisibleItems {
+                                        proxy.scrollTo("GRID_TOP", anchor: .top)
+                                    } else {
+                                        proxy.scrollTo(newIndex, anchor: .bottom)
+                                    }
+                                }
+                            }
+                            .onAppear {
+                                let maxVisibleItems = cols * Int(maxAllowedRows)
+                                if currentIndex < maxVisibleItems {
+                                    proxy.scrollTo("GRID_TOP", anchor: .top)
+                                } else {
+                                    proxy.scrollTo(currentIndex, anchor: .bottom)
+                                }
+                            }
+                        }
+                    } else {
+                        gridContent
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 12)
+                            .frame(width: CGFloat(contentWidth + 28), height: CGFloat(displayGridHeight + 24), alignment: .center)
+                    }
                 } else {
                     // Paginated Horizontal Row
                     HStack(spacing: CGFloat(spacing)) {
@@ -170,7 +238,7 @@ struct SwitcherView: View {
                             WindowCard(
                                 window: window,
                                 isSelected: cardIndex == currentIndex,
-                                scale: scale,
+                                scale: currentScale,
                                 refreshToken: refreshToken,
                                 onHover: { onHoverIndex(cardIndex) },
                                 onClick: { onClickIndex(cardIndex) },
@@ -180,7 +248,7 @@ struct SwitcherView: View {
                         }
                         Spacer()
                     }
-                    .frame(height: CGFloat(gridHeight + 15), alignment: .center)
+                    .frame(height: CGFloat(displayGridHeight + 12), alignment: .center)
                     
                     // Page Indicator Dots
                     let totalPages = Int(ceil(Double(windows.count) / Double(pageSize)))
@@ -194,10 +262,7 @@ struct SwitcherView: View {
                                     .animation(.spring(response: 0.25, dampingFraction: 0.7), value: currentPage)
                             }
                         }
-                        .frame(height: 10)
-                    } else {
-                        Color.clear
-                            .frame(height: 10)
+                        .frame(height: 8)
                     }
                 }
             }
@@ -205,27 +270,27 @@ struct SwitcherView: View {
             // Shortcut Help Footer
             Text(footerText)
                 .font(.system(size: 11, weight: .semibold, design: .rounded))
-                .foregroundColor(.white.opacity(0.4))
-                .padding(.bottom, 4)
+                .foregroundColor(.white.opacity(0.45))
+                .padding(.top, 4)
         }
+        .padding(.horizontal, 20)
         .padding(.vertical, 20)
-        // Solid fixed width and height to prevent sizing jumps and keep window bounded on screen
-        .frame(width: CGFloat(contentWidth + 60), height: CGFloat(gridHeight + 160))
+        .frame(width: CGFloat(contentWidth + 60))
         .background(
-            VisualEffectView(material: .hudWindow, blendingMode: .behindWindow, cornerRadius: 24)
+            VisualEffectView(material: .hudWindow, blendingMode: .behindWindow, cornerRadius: 22)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 24)
+                    RoundedRectangle(cornerRadius: 22)
                         .stroke(Color.white.opacity(0.18), lineWidth: 1.5)
                 )
         )
-        .cornerRadius(24)
+        .cornerRadius(22)
         .shadow(color: Color.black.opacity(0.6), radius: 24, x: 0, y: 12)
         .overlay(
             VStack {
                 HStack {
                     Spacer()
                     // System Resource Widget
-                    HStack(spacing: 12) {
+                    HStack(spacing: 10) {
                         // CPU Usage Info
                         HStack(spacing: 4) {
                             Image(systemName: "cpu")
@@ -249,16 +314,16 @@ struct SwitcherView: View {
                                 .foregroundColor(.white.opacity(0.8))
                         }
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(Color.black.opacity(0.25))
-                    .cornerRadius(8)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.black.opacity(0.3))
+                    .cornerRadius(6)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
                     )
-                    .padding(.trailing, 16)
-                    .padding(.top, 16)
+                    .padding(.trailing, 14)
+                    .padding(.top, 14)
                 }
                 Spacer()
             }
@@ -286,7 +351,7 @@ struct WindowCard: View {
     var body: some View {
         let cardWidth = 170.0 * scale
         
-        VStack(spacing: 10) {
+        VStack(spacing: 8) {
             CardThumbnailView(
                 window: window,
                 isSelected: isSelected,
@@ -299,17 +364,17 @@ struct WindowCard: View {
             )
             
             // App Details Text
-            HStack(spacing: 6) {
+            HStack(spacing: 5) {
                 if thumbnail == nil, let icon = window.appIcon {
                     Image(nsImage: icon)
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                        .frame(width: CGFloat(16 * scale), height: CGFloat(16 * scale))
+                        .frame(width: CGFloat(14 * scale), height: CGFloat(14 * scale))
                 }
                 
                 Text(window.ownerName)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundColor(isSelected ? .white : .white.opacity(0.7))
+                    .font(.system(size: CGFloat(12 * scale), weight: .bold, design: .rounded))
+                    .foregroundColor(isSelected ? .white : .white.opacity(0.75))
                     .lineLimit(1)
             }
             .frame(width: CGFloat(cardWidth))
@@ -389,21 +454,31 @@ struct CardThumbnailView: View {
                     .frame(width: CGFloat(cardWidth), height: CGFloat(cardHeight))
                     .clipped()
             } else {
-                // Fallback visual with beautiful dark gradient
-                LinearGradient(
-                    colors: [Color(nsColor: .darkGray).opacity(0.6), Color(nsColor: .black).opacity(0.8)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .frame(width: CGFloat(cardWidth), height: CGFloat(cardHeight))
-                
-                if let icon = window.appIcon {
-                    Image(nsImage: icon)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: CGFloat(52 * scale), height: CGFloat(52 * scale))
-                        .shadow(color: Color.black.opacity(0.4), radius: CGFloat(6 * scale), x: 0, y: CGFloat(3 * scale))
+                // Sleek fallback visual with dark metallic gradient & centered app icon
+                ZStack {
+                    LinearGradient(
+                        colors: [Color.blue.opacity(0.15), Color.black.opacity(0.85)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    
+                    if let icon = window.appIcon {
+                        VStack(spacing: 6) {
+                            Image(nsImage: icon)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: CGFloat(42 * scale), height: CGFloat(42 * scale))
+                                .shadow(color: Color.black.opacity(0.5), radius: CGFloat(4 * scale), x: 0, y: CGFloat(2 * scale))
+                            
+                            Text(window.title.isEmpty ? window.ownerName : window.title)
+                                .font(.system(size: CGFloat(10 * scale), weight: .semibold, design: .rounded))
+                                .foregroundColor(.white.opacity(0.6))
+                                .lineLimit(1)
+                                .padding(.horizontal, 10)
+                        }
+                    }
                 }
+                .frame(width: CGFloat(cardWidth), height: CGFloat(cardHeight))
             }
             
             // Small App Icon badge in bottom-left corner of thumbnail
@@ -414,14 +489,14 @@ struct CardThumbnailView: View {
                         Image(nsImage: icon)
                             .resizable()
                             .aspectRatio(contentMode: .fit)
-                            .frame(width: CGFloat(24 * scale), height: CGFloat(24 * scale))
-                            .padding(CGFloat(4 * scale))
-                            .background(Color.black.opacity(0.5))
-                            .cornerRadius(CGFloat(6 * scale))
+                            .frame(width: CGFloat(22 * scale), height: CGFloat(22 * scale))
+                            .padding(CGFloat(3 * scale))
+                            .background(Color.black.opacity(0.6))
+                            .cornerRadius(CGFloat(5 * scale))
                             .shadow(radius: 2)
                         Spacer()
                     }
-                    .padding(CGFloat(8 * scale))
+                    .padding(CGFloat(6 * scale))
                 }
                 .frame(width: CGFloat(cardWidth), height: CGFloat(cardHeight))
             }
@@ -455,7 +530,7 @@ struct CardThumbnailView: View {
                 .stroke(borderColor, lineWidth: borderWidth)
                 .shadow(color: shadowColor, radius: shadowRadius)
         )
-        .scaleEffect(isSelected ? 1.08 : (isHovered ? 1.04 : 1.0))
+        .scaleEffect(isSelected ? 1.06 : (isHovered ? 1.03 : 1.0))
         .offset(y: dragOffset.height)
         .opacity(isFadingOut ? 0.0 : 1.0)
         .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isSelected)
@@ -545,8 +620,8 @@ struct ActionPanel: View {
     let onSnapRight: () -> Void
     
     var body: some View {
-        VStack(spacing: CGFloat(6 * scale)) {
-            HStack(spacing: CGFloat(6 * scale)) {
+        VStack(spacing: CGFloat(5 * scale)) {
+            HStack(spacing: CGFloat(5 * scale)) {
                 // Close (Red)
                 ActionButton(icon: "xmark", color: .red, scale: scale, action: onClose)
                 
@@ -564,20 +639,19 @@ struct ActionPanel: View {
             }
             
             // Layout Snapping (Left half, Maximize, Right half)
-            HStack(spacing: CGFloat(6 * scale)) {
+            HStack(spacing: CGFloat(5 * scale)) {
                 ActionButton(icon: "arrow.left.to.line", color: .blue, scale: scale, action: onSnapLeft)
                 ActionButton(icon: "square.dashed", color: .cyan, scale: scale, action: onSnapMaximize)
                 ActionButton(icon: "arrow.right.to.line", color: .blue, scale: scale, action: onSnapRight)
             }
         }
-        .padding(CGFloat(5 * scale))
-        .background(Color.black.opacity(0.75))
-        .cornerRadius(CGFloat(10 * scale))
+        .padding(CGFloat(4 * scale))
+        .background(Color.black.opacity(0.8))
+        .cornerRadius(CGFloat(9 * scale))
         .overlay(
-            RoundedRectangle(cornerRadius: CGFloat(10 * scale))
+            RoundedRectangle(cornerRadius: CGFloat(9 * scale))
                 .stroke(Color.white.opacity(0.15), lineWidth: 1)
         )
-        .padding(CGFloat(6 * scale))
+        .padding(CGFloat(5 * scale))
     }
 }
-

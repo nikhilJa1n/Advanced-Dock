@@ -88,14 +88,25 @@ class SwitcherWindow: NSPanel {
         
         guard let targetScreen = screen else { return }
         
-        let screenFrame = targetScreen.frame
+        let visibleFrame = targetScreen.visibleFrame
         let windowFrame = self.frame
         
-        let x = screenFrame.origin.x + (screenFrame.width - windowFrame.width) / 2
-        // Position it slightly above the center (e.g. 55% height) for better ergonomics
-        let y = screenFrame.origin.y + (screenFrame.height - windowFrame.height) * 0.55
+        let x = visibleFrame.origin.x + (visibleFrame.width - windowFrame.width) / 2
+        // Center vertically within the visible desktop area (below menu bar / notch, above dock)
+        var y = visibleFrame.origin.y + (visibleFrame.height - windowFrame.height) * 0.50
         
-        logMessage("centerOnScreen: screenFrame=\(screenFrame) windowFrame=\(windowFrame) calculatedX=\(x) calculatedY=\(y)")
+        // Safety guard: ensure top edge of switcher never overlaps the top menu bar / notch area
+        let maxY = visibleFrame.maxY - 12
+        if (y + windowFrame.height) > maxY {
+            y = maxY - windowFrame.height
+        }
+        
+        // Safety guard: ensure bottom edge never goes below dock
+        if y < visibleFrame.origin.y + 12 {
+            y = visibleFrame.origin.y + 12
+        }
+        
+        logMessage("centerOnScreen: visibleFrame=\(visibleFrame) windowFrame=\(windowFrame) calculatedX=\(x) calculatedY=\(y)")
         self.setFrameOrigin(NSPoint(x: x, y: y))
     }
     

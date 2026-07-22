@@ -88,6 +88,14 @@ class AppState: ObservableObject {
         didSet { UserDefaults.standard.set(useGridLayout, forKey: "useGridLayout") }
     }
     
+    @Published var gridColumns: Int {
+        didSet { UserDefaults.standard.set(gridColumns, forKey: "gridColumns") }
+    }
+    
+    @Published var gridMaxRows: Int {
+        didSet { UserDefaults.standard.set(gridMaxRows, forKey: "gridMaxRows") }
+    }
+    
     private var timer: AnyCancellable?
     
     init() {
@@ -115,6 +123,8 @@ class AppState: ObservableObject {
         self.dockHoverDelay = delayVal == 0 ? 0.15 : delayVal
         
         self.useGridLayout = UserDefaults.standard.object(forKey: "useGridLayout") as? Bool ?? false
+        self.gridColumns = UserDefaults.standard.object(forKey: "gridColumns") as? Int ?? 0
+        self.gridMaxRows = UserDefaults.standard.object(forKey: "gridMaxRows") as? Int ?? 0
         
         self.groupTabbedWindows = UserDefaults.standard.object(forKey: "groupTabbedWindows") as? Bool ?? true
         self.hideMenuIcon = UserDefaults.standard.object(forKey: "hideMenuIcon") as? Bool ?? false
@@ -137,6 +147,8 @@ class AppState: ObservableObject {
         self.excludedApps = []
         self.dockHoverDelay = 0.15
         self.useGridLayout = false
+        self.gridColumns = 0
+        self.gridMaxRows = 0
         
         UserDefaults.standard.removeObject(forKey: "enableArrowNavigation")
         UserDefaults.standard.removeObject(forKey: "thumbnailScale")
@@ -148,6 +160,9 @@ class AppState: ObservableObject {
         UserDefaults.standard.removeObject(forKey: "hotkeyKeyCode")
         UserDefaults.standard.removeObject(forKey: "hotkeyModifiers")
         UserDefaults.standard.removeObject(forKey: "excludedApps")
+        UserDefaults.standard.removeObject(forKey: "useGridLayout")
+        UserDefaults.standard.removeObject(forKey: "gridColumns")
+        UserDefaults.standard.removeObject(forKey: "gridMaxRows")
         UserDefaults.standard.removeObject(forKey: "dockHoverDelay")
         UserDefaults.standard.removeObject(forKey: "useGridLayout")
         
@@ -503,6 +518,55 @@ struct GeneralTab: View {
                         description: "Arrange switcher thumbnails in a 2D multi-row grid instead of a single paginated horizontal row.",
                         isOn: $state.useGridLayout
                     )
+                    
+                    if state.useGridLayout {
+                        VStack(spacing: 12) {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Grid Columns")
+                                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                        .foregroundColor(.white)
+                                    Text("Set fixed number of columns or Auto (Responsive).")
+                                        .font(.system(size: 11, design: .rounded))
+                                        .foregroundColor(.white.opacity(0.6))
+                                }
+                                Spacer()
+                                Picker("", selection: $state.gridColumns) {
+                                    Text("Auto (Responsive)").tag(0)
+                                    Text("3 Columns").tag(3)
+                                    Text("4 Columns").tag(4)
+                                    Text("5 Columns").tag(5)
+                                    Text("6 Columns").tag(6)
+                                }
+                                .pickerStyle(MenuPickerStyle())
+                                .frame(width: 150)
+                            }
+                            
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Max Grid Rows")
+                                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                        .foregroundColor(.white)
+                                    Text("Limit maximum visible rows before scrolling.")
+                                        .font(.system(size: 11, design: .rounded))
+                                        .foregroundColor(.white.opacity(0.6))
+                                }
+                                Spacer()
+                                Picker("", selection: $state.gridMaxRows) {
+                                    Text("Auto (Fits Screen)").tag(0)
+                                    Text("2 Rows (e.g. 4×2)").tag(2)
+                                    Text("3 Rows (e.g. 4×3)").tag(3)
+                                    Text("4 Rows (e.g. 4×4)").tag(4)
+                                }
+                                .pickerStyle(MenuPickerStyle())
+                                .frame(width: 150)
+                            }
+                        }
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 12)
+                        .background(Color.white.opacity(0.04))
+                        .cornerRadius(8)
+                    }
                     
                     Divider()
                         .background(Color.white.opacity(0.04))
