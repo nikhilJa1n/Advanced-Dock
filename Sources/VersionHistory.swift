@@ -17,8 +17,9 @@ public struct VersionHistory {
             version: "3.0",
             releaseDate: "July 2026",
             isCurrent: true,
-            summary: "Add version history feature with detailed release notes and update scripts for automation",
+            summary: "Add grid layout configuration and dynamic column handling in SwitcherView",
             features: [
+                "Add grid layout configuration and dynamic column handling in SwitcherView",
                 "Add version history feature with detailed release notes and update scripts for automation",
                 "Add app icon caching and improve window image capture logic"
             ],
@@ -26,7 +27,7 @@ public struct VersionHistory {
                 
             ]
         ),
-                                                                VersionRelease(
+                                                                                VersionRelease(
             version: "2.7",
             releaseDate: "July 2026",
             isCurrent: false,
